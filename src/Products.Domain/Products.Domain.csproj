@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Domain layer is the centre of the onion: it has NO package and NO project
+    references. Nothing here knows about EF Core, ASP.NET, MediatR or JSON.
+    If a reference ever appears in this file, the dependency rule has been broken.
+  -->
+
+</Project>
