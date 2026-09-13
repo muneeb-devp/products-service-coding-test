@@ -94,3 +94,10 @@ dotnet_diagnostic.CA1848.severity = none      # LoggerMessage source-gen: overki
 [tests/**/*.cs]
 dotnet_diagnostic.CS1591.severity = none
 dotnet_diagnostic.CA1707.severity = none      # underscores in test method names are idiomatic
+
+# MediatR notification handlers are named <Event>Handler by convention across
+# the whole .NET ecosystem. CA1711 assumes the suffix means a CLR event
+# handler delegate, which these are not — renaming them would make the code
+# less recognisable, not more correct.
+[src/Products.Application/Products/EventHandlers/*.cs]
+dotnet_diagnostic.CA1711.severity = none
