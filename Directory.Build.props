@@ -1,0 +1,40 @@
+<Project>
+
+  <!--
+    Shared build settings for every project in the solution.
+    Kept in one place so language level, nullability and analyzer policy
+    cannot drift between layers.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Nullability violations are bugs, not suggestions. -->
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Deterministic, reproducible output. -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: "missing XML comment". Public API surface is documented;
+         forcing a comment onto every DTO property is noise, so warn-off here
+         and rely on review instead. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <Authors>Muneeb Mughal</Authors>
+    <Product>Products Service</Product>
+  </PropertyGroup>
+
+  <!-- Test projects share one set of conventions. -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>
