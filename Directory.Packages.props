@@ -44,6 +44,18 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Transitive pins — security">
+    <!--
+      Microsoft.EntityFrameworkCore.Sqlite pulls SQLitePCLRaw.lib.e_sqlite3
+      2.1.11 transitively, which carries a known high-severity advisory
+      (GHSA-2m69-gcr7-jv3q) in the bundled native SQLite binary. Central
+      transitive pinning (enabled above) lets us take the patched build without
+      waiting for an EF Core release to bump it. Remove this pin once EF Core
+      ships a version that already references a patched build.
+    -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
