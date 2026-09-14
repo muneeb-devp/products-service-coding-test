@@ -20,8 +20,8 @@ namespace Products.Infrastructure.Persistence.Migrations
                     Description = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     Colour = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
                     Sku = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Price = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
                     Currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: false)
                 },

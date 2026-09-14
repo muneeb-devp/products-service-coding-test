@@ -101,3 +101,12 @@ dotnet_diagnostic.CA1707.severity = none      # underscores in test method names
 # less recognisable, not more correct.
 [src/Products.Application/Products/EventHandlers/*.cs]
 dotnet_diagnostic.CA1711.severity = none
+
+# EF Core scaffolds migrations and the model snapshot, and regenerates them on
+# every `migrations add`. Holding machine-written files to the hand-written
+# style rules means either a failing build or reformatting that the next
+# scaffold undoes. Marked as generated so the style analysers skip them; the
+# correctness analysers still apply.
+[src/Products.Infrastructure/Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.IDE0161.severity = none

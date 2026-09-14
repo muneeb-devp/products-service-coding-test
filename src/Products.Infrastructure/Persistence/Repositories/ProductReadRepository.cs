@@ -122,8 +122,9 @@ internal sealed class ProductReadRepository(ProductsDbContext context) : IProduc
                 ? query.OrderByDescending(p => p.UpdatedAt)
                 : query.OrderBy(p => p.UpdatedAt),
 
-            // "createdat" and anything unrecognised: newest first is the most
-            // useful default for a catalogue listing.
+            // "createdat", plus the fallback for anything the validator let
+            // through unrecognised. Direction stays under the caller's control
+            // via sortDescending, so this picks the field only.
             _ => descending
                 ? query.OrderByDescending(p => p.CreatedAt)
                 : query.OrderBy(p => p.CreatedAt),

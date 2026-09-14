@@ -12,7 +12,7 @@ using Products.Infrastructure.Persistence;
 namespace Products.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ProductsDbContext))]
-    [Migration("20260913235327_InitialCreate")]
+    [Migration("20260914000300_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -31,7 +31,7 @@ namespace Products.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
@@ -48,7 +48,7 @@ namespace Products.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "Price", "Products.Domain.Products.Product.Price#Money", b1 =>

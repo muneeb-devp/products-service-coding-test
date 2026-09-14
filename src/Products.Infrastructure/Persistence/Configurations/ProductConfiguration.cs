@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Products.Domain.Products;
 
 namespace Products.Infrastructure.Persistence.Configurations;
@@ -14,6 +15,34 @@ namespace Products.Infrastructure.Persistence.Configurations;
 /// </remarks>
 internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
+    /// <summary>
+    /// Stores timestamps as UTC <see cref="DateTime"/> rather than
+    /// <see cref="DateTimeOffset"/>.
+    /// </summary>
+    /// <remarks>
+    /// SQLite refuses <c>ORDER BY</c> on a <see cref="DateTimeOffset"/> column,
+    /// because it persists the offset alongside the instant and the resulting
+    /// text does not sort chronologically. Since <c>createdAt</c> is the default
+    /// sort for the catalogue listing, that is not a corner case — it is the
+    /// most common query the service serves.
+    /// <para>
+    /// Converting to UTC loses nothing here: every timestamp originates from
+    /// <c>TimeProvider.GetUtcNow()</c>, so the offset is always zero. The domain
+    /// keeps the more expressive <see cref="DateTimeOffset"/>; only the storage
+    /// representation changes.
+    /// </para>
+    /// <para>
+    /// Applied to both providers rather than only to SQLite, deliberately. A
+    /// conversion that exists on the development database but not in production
+    /// means ordering and equality behave differently in the two places, which
+    /// is exactly the class of bug that survives every test suite.
+    /// </para>
+    /// </remarks>
+    private static readonly ValueConverter<DateTimeOffset, DateTime> UtcTimestampConverter =
+        new(
+            offset => offset.UtcDateTime,
+            utc => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)));
+
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.ToTable("Products");
@@ -85,8 +114,13 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.CreatedAt)
             .HasDatabaseName("IX_Products_CreatedAt");
 
-        builder.Property(p => p.CreatedAt).IsRequired();
-        builder.Property(p => p.UpdatedAt).IsRequired();
+        builder.Property(p => p.CreatedAt)
+            .IsRequired()
+            .HasConversion(UtcTimestampConverter);
+
+        builder.Property(p => p.UpdatedAt)
+            .IsRequired()
+            .HasConversion(UtcTimestampConverter);
 
         // Domain events are in-memory bookkeeping for the current transaction,
         // never a persisted column.
