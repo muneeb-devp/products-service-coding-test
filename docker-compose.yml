@@ -1,0 +1,74 @@
+# Brings up the API and the frontend together:
+#
+#     docker compose up --build
+#
+#   Frontend  http://localhost:3000
+#   API       http://localhost:8080
+#   Swagger   http://localhost:8080/swagger
+#   Health    http://localhost:8080/health
+#
+# The API runs with ASPNETCORE_ENVIRONMENT=Development on purpose, so Swagger UI
+# is served and a reviewer can exercise the endpoints without extra setup. A
+# real deployment would run Production and supply Jwt__SigningKey from a secret
+# store — the options are validated at start-up, so a missing key fails the boot
+# rather than silently running with a guessable one.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Products.Api/Dockerfile
+    image: products-api:local
+    container_name: products-api
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+
+      # The database lives on the named volume below, so the catalogue survives
+      # `docker compose down` and a rebuild.
+      ConnectionStrings__ProductsDatabase: "Data Source=/app/data/products.db"
+      Database__Provider: Sqlite
+      Database__SeedDemoData: "true"
+
+      # Must match the origin the browser actually loads the frontend from.
+      # The browser is on the host, so this is localhost:3000 rather than the
+      # compose service name.
+      Cors__AllowedOrigins__0: "http://localhost:3000"
+
+      Serilog__WriteTo__1__Args__path: "/app/logs/products-api-.log"
+    volumes:
+      - api-data:/app/data
+      - api-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked in at build time — Vite inlines it. This is the URL the
+        # *browser* uses, which is the host's published port, not the internal
+        # compose address.
+        VITE_API_BASE_URL: http://localhost:8080
+    image: products-frontend:local
+    container_name: products-frontend
+    ports:
+      - "3000:8080"
+    depends_on:
+      api:
+        # Waits for the API's healthcheck rather than merely for the container
+        # to exist, so the frontend is not served before the API can answer.
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  api-data:
+  api-logs:

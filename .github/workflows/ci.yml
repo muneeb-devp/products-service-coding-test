@@ -1,0 +1,204 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets the workflow be triggered by hand from the Actions tab.
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run's result irrelevant.
+# Cancelling it frees a runner instead of burning minutes on a stale commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only by default. A workflow that never writes should not hold a token
+# that can.
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  backend:
+    name: Backend — build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          # Driven by global.json rather than a version literal here, so the
+          # SDK that CI uses and the SDK a developer uses cannot drift apart.
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          # Keyed on the lock-free equivalent: with Central Package Management
+          # every version lives in Directory.Packages.props, so that file
+          # changing is exactly when the cache should be rebuilt.
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore ProductsService.slnx
+
+      - name: Build
+        # Warnings are treated as errors here but not locally. That keeps local
+        # iteration quick while making the zero-warning standard actually
+        # enforced — including the NuGet audit warnings that flag a dependency
+        # with a new security advisory.
+        run: dotnet build ProductsService.slnx --configuration Release --no-restore -warnaserror
+
+      - name: Unit tests — Domain
+        run: >
+          dotnet test tests/Products.Domain.Tests/Products.Domain.Tests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=domain.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Unit tests — Application
+        run: >
+          dotnet test tests/Products.Application.Tests/Products.Application.Tests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=application.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Integration tests — API
+        run: >
+          dotnet test tests/Products.Api.IntegrationTests/Products.Api.IntegrationTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=integration.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+
+      - name: Summarise coverage
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, os, xml.etree.ElementTree as ET
+          from collections import defaultdict
+
+          agg = defaultdict(lambda: [0, 0])
+          for path in glob.glob('TestResults/**/coverage.cobertura.xml', recursive=True):
+              for package in ET.parse(path).getroot().iter('package'):
+                  for cls in package.iter('class'):
+                      for line in cls.iter('line'):
+                          agg[package.get('name')][1] += 1
+                          if int(line.get('hits', '0')) > 0:
+                              agg[package.get('name')][0] += 1
+
+          rows, covered_total, line_total = [], 0, 0
+          for name, (covered, total) in sorted(agg.items()):
+              if not total:
+                  continue
+              covered_total += covered
+              line_total += total
+              rows.append(f'| {name} | {total} | {covered} | {covered / total * 100:.1f}% |')
+
+          summary = ['## Backend coverage', '', '| Assembly | Lines | Covered | Coverage |',
+                     '|---|---:|---:|---:|', *rows]
+          if line_total:
+              summary.append(
+                  f'| **Total** | **{line_total}** | **{covered_total}** '
+                  f'| **{covered_total / line_total * 100:.1f}%** |')
+
+          text = '\n'.join(summary)
+          print(text)
+          if path := os.environ.get('GITHUB_STEP_SUMMARY'):
+              with open(path, 'a') as handle:
+                  handle.write(text + '\n')
+          PY
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: TestResults/
+          retention-days: 7
+
+  frontend:
+    name: Frontend — build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci` rather than `npm install`: installs exactly the lockfile and
+        # fails if package.json and the lockfile disagree, so CI cannot quietly
+        # test a different dependency tree than a developer has.
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 7
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only worth running once the code itself is known good.
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Products.Api/Dockerfile
+          # Built but not pushed: this job exists to prove the Dockerfiles are
+          # valid and the images assemble, which is the part that silently rots.
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

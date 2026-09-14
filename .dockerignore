@@ -1,0 +1,33 @@
+# Keep the build context small and deterministic. Anything copied in that is not
+# needed both slows the build and invalidates the layer cache for no reason.
+
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+**/coverage/
+**/logs/
+**/node_modules/
+**/dist/
+
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+
+# Local databases and logs must never be baked into an image.
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.log
+
+# Real environment files stay out; .env.example is harmless but unused here.
+**/.env
+**/.env.*
+!**/.env.example
+
+**/.DS_Store
+docs/
+README.md
+LICENSE
