@@ -106,7 +106,7 @@ describe('productsApi', () => {
     })
   })
 
-  it('reports a conflict with the server’s explanation', async () => {
+  it('reports a conflict using the explanation from the server', async () => {
     mockFetch({
       ok: false,
       status: 409,
