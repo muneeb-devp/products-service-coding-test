@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+.vite
+
+# Real environment files stay local; .env.example is committed.
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log
