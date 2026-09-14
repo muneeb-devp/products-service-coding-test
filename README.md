@@ -53,7 +53,7 @@ volume and survives `docker compose down`.
 ### Option 2 — run it directly
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and
-[Node 20+](https://nodejs.org).
+[Node 20.19+ or 22.12+](https://nodejs.org) (what Vite 8 requires; CI uses Node 24).
 
 ```bash
 # Terminal 1 — API on http://localhost:5099
