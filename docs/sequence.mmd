@@ -1,0 +1,42 @@
+%% Example asynchronous flow: placing an order.
+%% Demonstrates eventual consistency — no service calls another synchronously.
+sequenceDiagram
+    autonumber
+    actor Customer
+    participant GW as API Gateway
+    participant Orders as Orders service
+    participant Broker as Message broker
+    participant Payments as Payments service
+    participant Products as Products service
+
+    Customer->>GW: POST /api/orders
+    GW->>Orders: create order
+    Orders->>Orders: persist Order (Pending)<br/>+ OrderPlaced in the SAME transaction
+    Orders-->>GW: 202 Accepted
+    GW-->>Customer: 202 Accepted — order is Pending
+
+    Note over Orders,Broker: A relay publishes the outbox row.<br/>The write and the announcement cannot diverge.
+    Orders-)Broker: OrderPlaced
+
+    Broker-)Payments: OrderPlaced
+    Payments->>Payments: take payment (idempotent on OrderId)
+    Payments-)Broker: PaymentProcessed
+
+    Broker-)Orders: PaymentProcessed
+    Orders->>Orders: Order -> Confirmed
+    Orders-)Broker: OrderConfirmed
+
+    Broker-)Products: OrderConfirmed
+    Products->>Products: decrement stock for each line
+
+    Note over Customer,Products: The customer was answered long before this settled.<br/>The system is eventually consistent, not immediately consistent.
+
+    rect rgb(253, 237, 237)
+        Note over Payments,Products: Failure path
+        Payments-)Broker: PaymentFailed
+        Broker-)Orders: PaymentFailed
+        Orders->>Orders: Order -> Cancelled
+        Orders-)Broker: OrderCancelled
+        Broker-)Products: OrderCancelled
+        Products->>Products: release any reserved stock
+    end

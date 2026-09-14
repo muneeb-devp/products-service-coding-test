@@ -1,0 +1,70 @@
+%% Products service within an event-driven microservices architecture.
+%% Rendered by GitHub natively; also exported to architecture.svg.
+flowchart LR
+    classDef client  fill:#f3e8fd,stroke:#8a4fd4,color:#2b1244
+    classDef edge    fill:#e8f0fe,stroke:#3b6fd4,color:#10243e
+    classDef service fill:#ffffff,stroke:#3b6fd4,stroke-width:2px,color:#10243e
+    classDef store   fill:#fef7e0,stroke:#c9911a,color:#3d2c05
+    classDef broker  fill:#e6f4ea,stroke:#2d8a4e,stroke-width:2px,color:#0d2a17
+
+    spa["React SPA"]:::client
+    partner["Mobile / partner clients"]:::client
+
+    gateway["API Gateway / BFF<br/>TLS · authn · routing · quotas"]:::edge
+
+    spa --> gateway
+    partner --> gateway
+
+    subgraph products_bc["Products — bounded context"]
+        direction TB
+        products_api["<b>Products API</b><br/>this repository<br/>Clean Architecture · CQRS"]:::service
+        products_db[("Products DB")]:::store
+        products_outbox[["outbox"]]:::store
+        products_api --> products_db
+        products_api -. same transaction .-> products_outbox
+    end
+
+    subgraph orders_bc["Orders — bounded context"]
+        direction TB
+        orders_api["<b>Orders API</b>"]:::service
+        orders_db[("Orders DB")]:::store
+        orders_outbox[["outbox"]]:::store
+        orders_api --> orders_db
+        orders_api -. same transaction .-> orders_outbox
+    end
+
+    subgraph payments_bc["Payments — bounded context"]
+        direction TB
+        payments_api["<b>Payments API</b>"]:::service
+        payments_db[("Payments DB")]:::store
+        payments_outbox[["outbox"]]:::store
+        payments_api --> payments_db
+        payments_api -. same transaction .-> payments_outbox
+    end
+
+    gateway --> products_api
+    gateway --> orders_api
+    gateway --> payments_api
+
+    broker{{"<b>Message broker — RabbitMQ</b><br/>topic exchange · durable queues · DLQ"}}:::broker
+
+    products_outbox -- "ProductCreated<br/>ProductPriceChanged" --> broker
+    orders_outbox   -- "OrderPlaced<br/>OrderConfirmed / OrderCancelled" --> broker
+    payments_outbox -- "PaymentProcessed<br/>PaymentFailed" --> broker
+
+    broker -- "OrderPlaced" --> payments_api
+    broker -- "PaymentProcessed<br/>PaymentFailed" --> orders_api
+    broker -- "OrderConfirmed / OrderCancelled" --> products_api
+    broker -- "ProductPriceChanged" --> orders_api
+
+    search["Search / read-model projector"]:::service
+    notify["Notifications"]:::service
+    broker -- "ProductCreated<br/>ProductPriceChanged" --> search
+    broker -- "OrderConfirmed<br/>PaymentFailed" --> notify
+
+    %% Neutral backgrounds for the bounded-context groupings, so the colour in
+    %% the diagram carries meaning (service / store / broker) rather than
+    %% decorating the containers.
+    style products_bc fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
+    style orders_bc   fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
+    style payments_bc fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
