@@ -20,7 +20,7 @@ public class MoneyTests
     [Fact]
     public void Create_allows_a_price_of_zero()
     {
-        // Zero is a legitimate price — a free sample or promotional item.
+        // Zero is a legitimate price, a free sample or promotional item.
         // Only negative prices are invalid.
         Money.Create(0m).Amount.Should().Be(0m);
     }

@@ -8,17 +8,6 @@ namespace Products.Application.Common.Behaviours;
 /// Runs every FluentValidation validator registered for a request before the
 /// handler executes.
 /// </summary>
-/// <remarks>
-/// Putting validation in the pipeline rather than at the top of each handler
-/// means it cannot be forgotten when a new command is added: registering a
-/// validator is enough to enforce it. Handlers are then free to assume their
-/// input is well-formed and contain only business logic.
-/// <para>
-/// Validators run concurrently and <em>all</em> failures are collected, so the
-/// client sees every problem with their payload at once rather than fixing them
-/// one round-trip at a time.
-/// </para>
-/// </remarks>
 /// <typeparam name="TRequest">The request type.</typeparam>
 /// <typeparam name="TResponse">The response type.</typeparam>
 public sealed class ValidationBehaviour<TRequest, TResponse>(

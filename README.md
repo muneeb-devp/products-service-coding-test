@@ -1,13 +1,12 @@
 # Products Service
 
-A product catalogue microservice — .NET 10 Web API with a React + TypeScript
-front end — built as a senior developer coding exercise.
+A product catalogue microservice: .NET 10 Web API with a React + TypeScript front
+end, built as a coding exercise.
 
 The brief asked for a secured Products API, an architecture diagram placing it in
-an event-driven estate, and a front end to consume it. The emphasis was
-*production grade, not just get it working*, so this README explains the
-reasoning as much as the mechanics: what was chosen, what was rejected, and what
-is deliberately missing.
+an event-driven system, and a front end to consume it. The emphasis was on
+production-grade code, so this README also records the decisions behind it and
+what is knowingly left out.
 
 ```
 ┌──────────────┐      ┌─────────────────┐      ┌──────────────────────────┐
@@ -16,24 +15,20 @@ is deliberately missing.
 └──────────────┘      └─────────────────┘      └──────────────────────────┘
 ```
 
----
-
 ## Contents
 
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
-- [Authentication](#authentication-how-to-exercise-the-secured-endpoints)
+- [Authentication](#authentication)
 - [API reference](#api-reference)
-- [Running the tests](#running-the-tests)
+- [Tests](#tests)
 - [Repository layout](#repository-layout)
-- [Design decisions and trade-offs](#design-decisions-and-trade-offs)
-- [Known gaps and what I would do next](#known-gaps-and-what-i-would-do-next)
-
----
+- [Design decisions](#design-decisions)
+- [Known gaps](#known-gaps)
 
 ## Quick start
 
-### Option 1 — Docker (one command)
+### Docker
 
 ```bash
 docker compose up --build
@@ -46,36 +41,34 @@ docker compose up --build
 | Swagger UI | <http://localhost:8080/swagger> |
 | Health | <http://localhost:8080/health> |
 
-The API seeds ten demo products across several colours on first run, so the
-colour filter has something to show immediately. The SQLite file lives on a named
-volume and survives `docker compose down`.
+Ten demo products are seeded on first run across several colours, so the colour
+filter has something to show. The SQLite file sits on a named volume and survives
+`docker compose down`.
 
-### Option 2 — run it directly
+### Running it directly
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and
-[Node 20.19+ or 22.12+](https://nodejs.org) (what Vite 8 requires; CI uses Node 24).
+Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download) and
+[Node 20.19+ or 22.12+](https://nodejs.org) (Vite 8's requirement; CI uses 24).
 
 ```bash
-# Terminal 1 — API on http://localhost:5099
+# Terminal 1: API on http://localhost:5099
 dotnet run --project src/Products.Api
 
-# Terminal 2 — front end on http://localhost:5173
+# Terminal 2: front end on http://localhost:5173
 cd frontend
-cp .env.example .env.local     # defaults to http://localhost:5099
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
 Swagger is at <http://localhost:5099/swagger>. The database is created and
-migrated on start-up; no manual step.
-
----
+migrated at start-up.
 
 ## Architecture
 
-### Inside the service — Clean Architecture
+### Inside the service
 
-Four projects, with dependencies pointing strictly inwards:
+Four projects, dependencies pointing inwards:
 
 ```
 Products.Api  ──▶  Products.Infrastructure  ──▶  Products.Application  ──▶  Products.Domain
@@ -83,64 +76,60 @@ Products.Api  ──▶  Products.Infrastructure  ──▶  Products.Applicatio
   middleware         migrations                    validators, DTOs           value objects
 ```
 
-`Products.Domain.csproj` has **no package references and no project references
-at all** — the file is deliberately empty. Nothing in the domain knows about EF
-Core, ASP.NET, MediatR or JSON. That is not a convention maintained by review; a
-reference appearing in that file is the dependency rule being broken, visibly.
+`Products.Domain.csproj` has no package or project references at all; the file is
+empty. Nothing in the domain knows about EF Core, ASP.NET, MediatR or JSON, and a
+reference appearing in that file means the dependency rule has been broken.
 
-Reads and writes are separated (CQRS): `IProductRepository` loads whole
-aggregates for the write side, `IProductReadRepository` projects to DTOs for the
-read side. Neither exposes `IQueryable`, so EF Core's query-translation rules
-cannot leak upwards into application logic.
+Reads and writes are separated. `IProductRepository` loads aggregates for the
+write side, `IProductReadRepository` projects to DTOs for reads. Neither exposes
+`IQueryable`, so EF Core's query-translation rules stay in the infrastructure
+layer.
 
 Cross-cutting concerns are MediatR pipeline behaviours rather than code repeated
-in each handler, which means they cannot be forgotten when a handler is added:
+per handler:
 
-| Behaviour | What it does |
+| Behaviour | Purpose |
 |---|---|
-| `ValidationBehaviour` | Runs every registered validator; collects *all* failures into one 400 |
-| `LoggingBehaviour` | Structured entry/exit logging per request |
-| `PerformanceBehaviour` | Warns when a request exceeds 500 ms |
+| `ValidationBehaviour` | Runs registered validators, collects all failures into one 400 |
+| `LoggingBehaviour` | Structured entry/exit logging |
+| `PerformanceBehaviour` | Warns on requests over 500 ms |
 
-### In the wider system — event-driven
+### In a wider system
 
 ![Architecture](docs/architecture.png)
 
-Products, Orders and Payments are separate bounded contexts, each owning its own
-datastore, communicating through a broker rather than calling each other.
+Products, Orders and Payments are separate bounded contexts, each owning its
+datastore, communicating through a broker instead of calling each other.
 
-**[→ Full write-up in `docs/architecture.md`](docs/architecture.md)** — covers the
-event catalogue, an end-to-end order sequence with its failure path, why events
-beat synchronous calls for state changes (and where they do not), the cost in
-eventual consistency and idempotency, RabbitMQ vs Kafka, and exactly how this
-service's existing domain events would become published integration events.
+[Full write-up in `docs/architecture.md`](docs/architecture.md): event catalogue,
+an end-to-end order sequence with its failure path, the trade-offs of events
+versus synchronous calls, RabbitMQ versus Kafka, and how this service's existing
+domain events would become published integration events.
 
-The seam is already in place and load-bearing: `Product.Create` raises
-`ProductCreatedDomainEvent`, dispatched only after the transaction commits, with
-the domain carrying no dependency on the dispatch mechanism.
+That seam already exists: `Product.Create` raises `ProductCreatedDomainEvent`,
+dispatched after the transaction commits, with the domain carrying no dependency
+on the dispatch mechanism.
 
----
+## Authentication
 
-## Authentication: how to exercise the secured endpoints
+`/health` is anonymous. Everything under `/api/products` needs a bearer token.
 
-`/health` is anonymous. Everything under `/api/products` requires a bearer token.
-
-> **`/api/auth/token` is a stand-in for a real identity provider.** It exists so
-> the secured endpoints can be exercised without standing up Azure AD, Auth0 or
-> IdentityServer first. See [Design decisions](#3-authentication-is-a-real-jwt-pipeline-with-a-deliberately-fake-issuer)
-> for what production would change.
+`/api/auth/token` stands in for a real identity provider so the secured endpoints
+can be exercised without setting up Azure AD, Auth0 or IdentityServer. See
+[design decisions](#3-real-jwt-validation-stand-in-issuer) for what production
+would change.
 
 **Demo credentials:** `demo` / `Password123!`
 
-### Via Swagger
+### Swagger
 
 1. Open <http://localhost:8080/swagger>
-2. `POST /api/auth/token` → **Try it out** → **Execute** with the credentials above
-3. Copy the `accessToken` value from the response
-4. Click **Authorize** (top right), paste the token, **Authorize**
-5. Every secured endpoint now works
+2. `POST /api/auth/token`, Try it out, Execute
+3. Copy `accessToken` from the response
+4. Click Authorize, paste the token
+5. The secured endpoints now work
 
-### Via curl
+### curl
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/token \
@@ -151,60 +140,54 @@ curl http://localhost:8080/api/products -H "Authorization: Bearer $TOKEN"
 curl "http://localhost:8080/api/products?colour=Red" -H "Authorization: Bearer $TOKEN"
 ```
 
-### Via the front end
+### Front end
 
-The sign-in panel is pre-filled with the demo credentials. It calls the same
-token endpoint and stores the result, so the reviewer can see how auth is wired
-without a real login flow.
-
----
+The sign-in panel is pre-filled with the demo credentials, calls the same token
+endpoint and stores the result, so the auth wiring is visible without a real login
+flow.
 
 ## API reference
 
-All responses are JSON. Errors are [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807)
+Responses are JSON; errors are [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807)
 `ProblemDetails`.
 
 | Method | Route | Auth | Purpose |
 |---|---|:---:|---|
-| `GET` | `/health` | — | Readiness, including a real database probe |
-| `GET` | `/health/live` | — | Liveness, deliberately excluding the database |
-| `POST` | `/api/auth/token` | — | Issue a demo bearer token |
+| `GET` | `/health` | | Readiness, includes a database probe |
+| `GET` | `/health/live` | | Liveness, excludes the database |
+| `POST` | `/api/auth/token` | | Issue a demo bearer token |
 | `GET` | `/api/auth/me` | ✓ | Echo the caller's claims |
 | `GET` | `/api/products` | ✓ | List, paged and sorted |
-| `GET` | `/api/products?colour=Red` | ✓ | **Filter by colour** |
-| `GET` | `/api/products/colour/{colour}` | ✓ | **Filter by colour** (route form) |
+| `GET` | `/api/products?colour=Red` | ✓ | Filter by colour |
+| `GET` | `/api/products/colour/{colour}` | ✓ | Filter by colour, route form |
 | `GET` | `/api/products/{id}` | ✓ | Fetch one |
-| `POST` | `/api/products` | ✓ | Create — 201 + `Location` |
+| `POST` | `/api/products` | ✓ | Create, returns 201 + `Location` |
 | `PUT` | `/api/products/{id}` | ✓ | Update |
-| `DELETE` | `/api/products/{id}` | ✓ | Delete — 204 |
+| `DELETE` | `/api/products/{id}` | ✓ | Delete, returns 204 |
 
-Query parameters on the list endpoints: `page` (default 1), `pageSize` (default
-20, **max 100**), `sortBy` (`name`, `price`, `colour`, `sku`, `createdAt`,
-`updatedAt`), `sortDescending`, `colour`.
+Query parameters: `page` (default 1), `pageSize` (default 20, max 100), `sortBy`
+(`name`, `price`, `colour`, `sku`, `createdAt`, `updatedAt`), `sortDescending`,
+`colour`.
 
-Both `/api/products` and `/api/v1/products` route to the same actions, so the
-unversioned contract from the brief keeps working while clients that want to pin
-a version can. Versions can also be selected by the `X-Api-Version` header or an
-`api-version` query parameter.
-
-### Status codes
+`/api/products` and `/api/v1/products` both route to the same actions, so the
+unversioned contract from the brief keeps working alongside an explicit version.
+Versions can also be selected with the `X-Api-Version` header or an `api-version`
+query parameter.
 
 | Code | When |
 |---|---|
 | `200` / `201` / `204` | Success. Create returns 201 with a `Location` header |
-| `400` | Validation failed — body lists **every** failing field at once |
+| `400` | Validation failed; the body lists every failing field |
 | `401` | Missing, malformed, expired or wrongly-signed token |
 | `404` | No such product |
 | `409` | SKU already in use |
-| `429` | Rate limit exceeded — carries `Retry-After` |
+| `429` | Rate limited; carries `Retry-After` |
 
----
-
-## Running the tests
+## Tests
 
 ```bash
-dotnet test                          # all 187 backend tests
-cd frontend && npm test              # all 45 front-end tests
+dotnet test                # 187 backend tests
+cd frontend && npm test    # 45 front-end tests
 ```
 
 With coverage:
@@ -214,34 +197,31 @@ dotnet test --collect:"XPlat Code Coverage"
 cd frontend && npm run test:coverage
 ```
 
-| Suite | Tests | What it covers |
+| Suite | Tests | Covers |
 |---|---:|---|
 | `Products.Domain.Tests` | 59 | Invariants, value objects, domain events, boundaries |
-| `Products.Application.Tests` | 74 | Handlers, validators, pipeline behaviours, paging |
+| `Products.Application.Tests` | 74 | Handlers, validators, behaviours, paging |
 | `Products.Api.IntegrationTests` | 54 | Full HTTP pipeline over real SQL, both sides of auth |
 | `frontend` | 45 | Form validation, table, filter, API client, app states |
 
-Backend line coverage is ~78%, front end ~83%. The aim was meaningful coverage
-rather than a number: every edge case the brief called out has a named test —
-invalid colour, empty name, negative price, empty result set — plus the ones that
-actually bite in production, such as differently-cased SKUs colliding as
-duplicates and pages not overlapping when the sort key is not unique.
+Backend line coverage is around 78%, front end around 83%. The edge cases the
+brief called out each have a named test (invalid colour, empty name, negative
+price, empty result set), along with ones that bite in practice: differently-cased
+SKUs colliding as duplicates, and pages not overlapping when the sort key is not
+unique.
 
-Integration tests run against **SQLite, not EF's InMemory provider**. InMemory is
-not a relational database: it ignores unique indexes, column lengths and SQL
-translation, so a suite built on it would pass while the duplicate-SKU constraint
-and the colour-filter query were both broken.
+Integration tests run against SQLite rather than EF's InMemory provider. InMemory
+ignores unique indexes, column lengths and SQL translation, so the duplicate-SKU
+constraint and the colour-filter query would both go untested.
 
-CI runs all four suites plus a type-check and both Docker builds on every push
-and pull request — [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
----
+CI runs all four suites plus a type-check and both Docker builds on every push and
+pull request: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Repository layout
 
 ```
 ├── src/
-│   ├── Products.Domain/          entities, value objects, domain events — zero dependencies
+│   ├── Products.Domain/          entities, value objects, domain events; no dependencies
 │   ├── Products.Application/     CQRS handlers, validators, DTOs, abstractions
 │   ├── Products.Infrastructure/  EF Core, repositories, migrations, event dispatch
 │   └── Products.Api/             controllers, middleware, auth, DI composition root
@@ -258,59 +238,52 @@ and pull request — [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 └── docker-compose.yml
 ```
 
----
+## Design decisions
 
-## Design decisions and trade-offs
-
-### 1. Clean Architecture, and an empty Domain csproj
+### 1. Clean Architecture
 
 For a service this size the layering is more structure than the feature set
-strictly needs. It earns its place because the brief is explicitly about a
-*microservice in a distributed system*: the value is that the domain and
-application layers have no idea whether they are called by HTTP, a message
-consumer, or a background job. Adding a broker consumer later means a new entry
-point, not a rewrite.
+needs. It earns its place because the brief is about a microservice in a
+distributed system: the domain and application layers do not know whether they
+are driven by HTTP, a message consumer or a background job, so adding a broker
+consumer later is a new entry point rather than a rewrite.
 
-The concrete payoff is that `Products.Domain.csproj` is empty. The dependency
-rule is enforced by the compiler, not by discipline.
+The practical result is that `Products.Domain.csproj` is empty, which makes the
+dependency rule a compiler concern rather than a review concern.
 
-### 2. MediatR at version 12.5.0, FluentAssertions at 7.x
+### 2. MediatR 12.5.0 and FluentAssertions 7.x
 
-Both libraries moved to paid commercial licences in recent majors — MediatR at
-13, FluentAssertions at 8. Both are pinned here to the last release under their
-original OSS licence (Apache 2.0), via Central Package Management.
+Both libraries moved to paid commercial licences in later majors (MediatR at 13,
+FluentAssertions at 8). Both are pinned here to the last release under Apache 2.0,
+through Central Package Management.
 
-This is the kind of thing that is cheap to get right now and expensive to
-discover during a legal review later. It is also why every version in the
-solution lives in one file: `Directory.Packages.props` makes version drift
-between projects structurally impossible rather than merely discouraged.
+Keeping every version in `Directory.Packages.props` also means version drift
+between projects is not possible.
 
-### 3. Authentication is a real JWT pipeline with a deliberately fake issuer
+### 3. Real JWT validation, stand-in issuer
 
-The validation is production-shaped. Issuer, audience, signing key and lifetime
-are all validated, clock skew is cut from the default five minutes to thirty
-seconds, and the signing algorithm is **pinned** — leaving it open is the root of
-the classic `alg` confusion attacks.
+Validation is production-shaped: issuer, audience, signing key and lifetime are
+all checked, clock skew is reduced from the default five minutes to thirty
+seconds, and the signing algorithm is pinned, since leaving it open is the basis
+of `alg` confusion attacks.
 
-What is fake is the *issuer*. Production would use an external IdP with
-asymmetric signing (RS256) and keys published via JWKS, so this API would hold
-only a verification key and never one capable of minting tokens. The token
-endpoint would not exist.
+The issuer is what is fake. Production would use an external IdP with asymmetric
+signing (RS256) and keys published via JWKS, so the API would hold a verification
+key only. The token endpoint would not exist.
 
-The development signing key is committed in `appsettings.Development.json`. That
-is deliberate, so the repository clones and runs, and it is safe only because it
-is loaded by the Development environment alone. There is no production fallback:
-options are validated at start-up, so a deployment without `Jwt__SigningKey`
-fails to boot rather than running with a guessable key.
+The development signing key is committed in `appsettings.Development.json` so the
+repository clones and runs. It is only loaded by the Development environment, and
+there is no production fallback: options are validated at start-up, so a
+deployment without `Jwt__SigningKey` fails to boot.
 
 ### 4. SQLite by default, SQL Server by configuration
 
-The provider is chosen by configuration, not compiled in, so moving to SQL Server
-is a connection string and one setting. SQLite is the default because it makes
-`docker compose up` a single command with no external dependency.
+The provider is configuration, not code, so switching is a connection string and
+one setting. SQLite is the default because it keeps `docker compose up` to a
+single command with no external dependency.
 
-**The honest caveat:** the committed migration set targets SQLite. EF Core
-migrations are provider-specific, so SQL Server needs its own:
+The caveat: the committed migration set targets SQLite. EF Core migrations are
+provider-specific, so SQL Server needs its own:
 
 ```bash
 dotnet ef migrations add InitialCreate \
@@ -318,115 +291,92 @@ dotnet ef migrations add InitialCreate \
   --output-dir Persistence/Migrations/SqlServer
 ```
 
-Shipping a single migration set and calling the service "database agnostic" would
-have been the easier claim and a false one.
+### 5. Timestamps stored as UTC `DateTime`
 
-### 5. Timestamps stored as UTC `DateTime`, not `DateTimeOffset`
+SQLite rejects `ORDER BY` on a `DateTimeOffset` column, and `createdAt` is the
+default sort, so the most common query in the service returned a 500. Found by
+running it, not by reading it.
 
-Found by running the service rather than by reading it: SQLite refuses `ORDER BY`
-on a `DateTimeOffset` column, and `createdAt` is the default sort — so the most
-common query in the service returned a 500.
+The fix is a value converter storing UTC `DateTime`. Nothing is lost, since every
+timestamp comes from `TimeProvider.GetUtcNow()`. It is applied to both providers
+so that ordering cannot behave differently in development and production.
 
-The fix is a value converter storing UTC `DateTime`. Nothing is lost, because
-every timestamp originates from `TimeProvider.GetUtcNow()`. It is applied to
-**both** providers deliberately: a conversion present in development but not in
-production means ordering behaves differently in the two places, which is exactly
-the class of bug that survives a green test suite.
-
-### 6. Rate limits on writes and auth, not on reads
+### 6. Rate limits on writes and auth only
 
 Reads are cheap and idempotent; writes cost a database round trip, and the token
-endpoint is what credential stuffing targets. Throttling reads at the same rate
-would degrade the front end for no benefit.
+endpoint is the target for credential stuffing. Throttling reads would degrade the
+front end for no benefit.
 
-Buckets are partitioned per authenticated user, falling back to remote IP. That
-fallback is only correct if the address is the *client's* — behind a load
-balancer it is the proxy's, which would put every anonymous user on the planet in
-one bucket. Hence `UseForwardedHeaders`, with `KnownProxies` left empty and
-commented, because clearing it without naming the real proxy lets a client spoof
-`X-Forwarded-For` to escape its own limit.
+Buckets are per authenticated user, falling back to remote IP. That fallback is
+only correct if the address is the client's, and behind a load balancer it is the
+proxy's, which would put every anonymous user in one bucket. Hence
+`UseForwardedHeaders`, with `KnownProxies` left empty and commented, because
+clearing it without naming the real proxy lets a client spoof `X-Forwarded-For`.
 
 ### 7. Controllers rather than minimal APIs
 
-Minimal APIs would be a defensible choice. Controllers were picked because
-attribute routing, API versioning, `[Authorize]`, per-endpoint rate limiting and
-Swagger's XML documentation all compose more cleanly through attributes, and
-because the alternative tends to push cross-cutting concerns into an endpoint
-registration file that grows without structure.
+Minimal APIs would also work. Controllers were chosen because attribute routing,
+API versioning, `[Authorize]`, per-endpoint rate limiting and Swagger's XML
+documentation compose more cleanly through attributes.
 
-### 8. Hand-written mapping, no AutoMapper
+### 8. Hand-written mapping
 
-`ProductDto.FromEntity` is a handful of assignments that the compiler checks and
-that appear in "find usages". A mapping library would add a dependency and move
-those errors from build time to run time, in exchange for saving about fifteen
-lines.
+`ProductDto.FromEntity` is a few assignments the compiler checks. A mapping
+library would add a dependency and move those errors to run time to save about
+fifteen lines.
 
 ### 9. Value objects for SKU and Money
 
 A bare `string Sku` lets `"abc-1"` and `"ABC-1"` become two rows behind a unique
-index. A bare `decimal Price` puts the "must not be negative" rule wherever
-someone remembers to put it. Wrapping both makes the invalid states
-unrepresentable and gives each rule exactly one home — and `Money` binds an
-amount to its currency, so adding GBP to USD stops being expressible.
+index. A bare `decimal Price` leaves the "not negative" rule wherever someone
+remembers to put it. `Money` also binds an amount to its currency, so adding GBP
+to USD stops being expressible.
 
-### 10. `localStorage` for the demo token — a knowingly wrong choice
+### 10. `localStorage` for the demo token
 
-A production SPA should not keep a bearer token in `localStorage`: anything
-running on the page can read it, so any XSS becomes credential theft. The usual
-answer is a short-lived token in memory alongside a refresh token in an
-`HttpOnly` cookie.
+A production SPA should not keep a bearer token in `localStorage`, since anything
+running on the page can read it and an XSS becomes credential theft. The usual
+answer is a short-lived token in memory with a refresh token in an `HttpOnly`
+cookie.
 
-It is used here because the demo has no refresh flow and a page reload losing the
-session would obstruct review. Flagged in the code as well as here, because an
-undocumented shortcut is indistinguishable from a mistake.
+It is used here because the demo has no refresh flow and losing the session on
+reload would get in the way of review. Flagged in the code as well.
 
----
-
-## Known gaps and what I would do next
-
-Stated plainly, because knowing what is missing matters more than pretending
-nothing is.
+## Known gaps
 
 **Not built**
-- **No real broker integration.** Domain events are raised and dispatched
-  in-process; the outbox and relay that would publish them are described in
-  `docs/architecture.md` but not implemented. The extension point is a single
-  event handler.
-- **No SQL Server migration set** — see decision 4.
-- **No authorisation, only authentication.** Every valid token can do everything.
-  A role claim is issued and unused, so `[Authorize(Roles = …)]` is a small step,
-  but scopes and resource-level permissions are absent.
-- **No refresh tokens or revocation.** A leaked token is valid until it expires;
-  the short lifetime *is* the mitigation.
 
-**Would come next, roughly in order**
-1. **Outbox + relay**, publishing `ProductCreated` and `ProductPriceChanged` to
-   RabbitMQ. The single highest-value addition, and the one the architecture is
-   already shaped around.
-2. **OpenTelemetry tracing**, propagated through message headers so a trace
-   survives the hop through the broker. The service already stamps a `traceId` on
-   every response and log line; this extends it across services.
-3. **Optimistic concurrency** on update. Two concurrent `PUT`s currently last-write-wins
-   silently. A `rowversion` and a `409` would make the conflict visible.
-4. **Kubernetes manifests** using the liveness and readiness probes that already
-   exist, with migrations as a pre-deploy job rather than at start-up — so N
-   replicas do not race to migrate one schema.
-5. **Cursor-based pagination** alongside offset. `OFFSET` degrades on large
-   tables and can skip rows when data shifts between requests; the ordering is
-   already given a unique tiebreaker to make a cursor straightforward.
-6. **A real IdP**, retiring `/api/auth/token` entirely.
+- No broker integration. Domain events are raised and dispatched in-process; the
+  outbox and relay are described in `docs/architecture.md` but not implemented.
+  The extension point is a single event handler.
+- No SQL Server migration set (see decision 4).
+- Authentication without authorisation. Every valid token can do everything. A
+  role claim is issued but unused.
+- No refresh tokens or revocation. The short token lifetime is the mitigation.
 
-**Deliberately not done**
-- No caching layer. Premature without a measured read pattern, and cache
-  invalidation on a catalogue that publishes change events deserves a design, not
-  a `MemoryCache` sprinkled in.
-- No repository generic base class. Two repositories do not justify an
-  abstraction that would have to be un-abstracted the first time one of them
-  needs something specific.
+**Next steps, roughly in order**
+
+1. Outbox and relay, publishing `ProductCreated` and `ProductPriceChanged` to
+   RabbitMQ. The highest-value addition, and the one the architecture is shaped
+   around.
+2. OpenTelemetry tracing propagated through message headers, extending the
+   existing `traceId` across services.
+3. Optimistic concurrency on update. Two concurrent `PUT`s currently
+   last-write-wins silently; a `rowversion` and a 409 would surface the conflict.
+4. Kubernetes manifests using the existing liveness and readiness probes, with
+   migrations as a pre-deploy job so replicas do not race to migrate one schema.
+5. Cursor-based pagination alongside offset. `OFFSET` degrades on large tables and
+   can skip rows when data shifts between requests; the ordering already has a
+   unique tiebreaker to make a cursor straightforward.
+6. A real IdP, retiring `/api/auth/token`.
+
+**Left out on purpose**
+
+- No caching layer. Premature without a measured read pattern, and invalidation on
+  a catalogue that publishes change events needs a design.
+- No generic repository base class. Two repositories do not justify it.
 - No CSP header on the front end. A policy written without knowing the real asset
-  origins is either ineffective or breaks the page; better omitted than guessed.
-
----
+  origins either does nothing or breaks the page.
 
 ## Licence
 

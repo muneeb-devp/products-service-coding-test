@@ -37,10 +37,6 @@ public sealed class RateLimitingTests : IAsyncLifetime, IDisposable
     /// <summary>
     /// Satisfies CA1001: this class owns the factory it creates.
     /// </summary>
-    /// <remarks>
-    /// The real teardown is in <see cref="DisposeAsync"/>, which xUnit awaits.
-    /// This exists so the ownership is declared through the type system too.
-    /// </remarks>
     public void Dispose()
     {
         _client?.Dispose();

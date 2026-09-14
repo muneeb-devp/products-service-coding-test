@@ -5,13 +5,6 @@ namespace Products.Application.Common.Abstractions;
 /// <summary>
 /// The filter, sort and paging parameters for a product listing.
 /// </summary>
-/// <remarks>
-/// A single options object, with the colour filter <em>optional</em>, is what
-/// lets "list all products" and "list only the red ones" share one query handler
-/// and one SQL path. Giving the colour filter its own endpoint and its own
-/// handler would duplicate the paging and sorting logic, and the two copies
-/// would drift.
-/// </remarks>
 public sealed record ProductQueryOptions
 {
     /// <summary>1-based page number.</summary>
@@ -35,13 +28,6 @@ public sealed record ProductQueryOptions
     /// <summary>
     /// The sort fields a client may request.
     /// </summary>
-    /// <remarks>
-    /// An allow-list, not a free-text column name. The value arrives from the
-    /// query string, and mapping it to a column by string concatenation would be
-    /// an injection vector; matching it against this closed set removes the
-    /// question entirely. Comparison is case-insensitive so <c>createdat</c> and
-    /// <c>createdAt</c> both work.
-    /// </remarks>
     public static readonly IReadOnlySet<string> AllowedSortFields =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {

@@ -9,11 +9,6 @@ namespace Products.Application.Products.EventHandlers;
 /// <summary>
 /// Reacts to <see cref="ProductPriceChangedDomainEvent"/>.
 /// </summary>
-/// <remarks>
-/// A price change is the event other bounded contexts most want: Orders needs it
-/// to decide whether a basket still reflects current pricing, and Payments needs
-/// it for reconciliation. See <c>docs/architecture.md</c>.
-/// </remarks>
 public sealed class ProductPriceChangedDomainEventHandler(
     ILogger<ProductPriceChangedDomainEventHandler> logger)
     : INotificationHandler<DomainEventNotification<ProductPriceChangedDomainEvent>>

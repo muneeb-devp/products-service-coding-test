@@ -5,12 +5,6 @@ namespace Products.Api.Contracts;
 /// <summary>
 /// The wire shape of a paged collection.
 /// </summary>
-/// <remarks>
-/// Paging metadata travels in the body rather than only in headers, so a browser
-/// client can render "page 2 of 7" without reading custom response headers —
-/// which, for a cross-origin request, would additionally have to be allow-listed
-/// through <c>Access-Control-Expose-Headers</c>.
-/// </remarks>
 /// <typeparam name="T">The item type.</typeparam>
 public sealed record PagedResponse<T>
 {
@@ -39,12 +33,6 @@ public sealed record PagedResponse<T>
 /// <summary>
 /// Maps application-layer paged results onto their wire shape.
 /// </summary>
-/// <remarks>
-/// An extension method rather than a static factory on
-/// <see cref="PagedResponse{T}"/> itself: a static member on a generic type has
-/// to be called as <c>PagedResponse&lt;ProductDto&gt;.From(x)</c>, repeating a
-/// type argument the compiler can infer here.
-/// </remarks>
 public static class PagedResponseExtensions
 {
     /// <summary>Converts a paged result into its wire representation.</summary>

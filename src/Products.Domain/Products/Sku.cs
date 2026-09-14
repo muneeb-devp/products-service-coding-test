@@ -6,18 +6,6 @@ namespace Products.Domain.Products;
 /// <summary>
 /// A Stock Keeping Unit: the human-readable business identifier for a product.
 /// </summary>
-/// <remarks>
-/// A value object rather than a bare <see cref="string"/>. Two benefits that a
-/// string cannot give us:
-/// <list type="number">
-///   <item>It is impossible to construct an invalid SKU — validation lives in
-///         the only constructor, so any <see cref="Sku"/> in the system is valid
-///         by definition.</item>
-///   <item>It normalises on the way in (trim + upper-case), so <c>"abc-123"</c>
-///         and <c>" ABC-123 "</c> cannot both exist as distinct rows behind a
-///         unique index.</item>
-/// </list>
-/// </remarks>
 public sealed partial record Sku
 {
     /// <summary>Shortest permitted SKU length.</summary>

@@ -10,7 +10,7 @@
 # The API runs with ASPNETCORE_ENVIRONMENT=Development on purpose, so Swagger UI
 # is served and a reviewer can exercise the endpoints without extra setup. A
 # real deployment would run Production and supply Jwt__SigningKey from a secret
-# store — the options are validated at start-up, so a missing key fails the boot
+# store. Options are validated at start-up, so a missing key fails the boot
 # rather than silently running with a guessable one.
 
 services:
@@ -54,7 +54,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Baked in at build time — Vite inlines it. This is the URL the
+        # Baked in at build time, Vite inlines it. This is the URL the
         # *browser* uses, which is the host's published port, not the internal
         # compose address.
         VITE_API_BASE_URL: http://localhost:8080

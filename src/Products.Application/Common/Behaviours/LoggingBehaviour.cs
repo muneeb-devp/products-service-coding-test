@@ -8,17 +8,6 @@ namespace Products.Application.Common.Behaviours;
 /// Emits a structured log entry for every request entering and leaving the
 /// Application layer.
 /// </summary>
-/// <remarks>
-/// The request name is logged as a named property rather than interpolated into
-/// the message, so log aggregation can group by <c>RequestName</c> without
-/// parsing strings.
-/// <para>
-/// Request <em>contents</em> are intentionally not logged. Commands carry
-/// user-supplied data, and a blanket "log the whole payload" behaviour is how
-/// personal data ends up in log files. Individual fields can be added
-/// deliberately where they are known to be safe.
-/// </para>
-/// </remarks>
 public sealed class LoggingBehaviour<TRequest, TResponse>(
     ILogger<LoggingBehaviour<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>

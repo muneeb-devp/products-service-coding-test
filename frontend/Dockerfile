@@ -21,8 +21,8 @@ COPY . .
 # known here rather than at container start. The consequence is one image per
 # target environment.
 #
-# The alternative — emitting a config.js at container start and reading it at
-# run time — buys one image for all environments, at the cost of an extra
+# The alternative, emitting a config.js at container start and reading it at
+# run time, buys one image for all environments, at the cost of an extra
 # request before the app can talk to anything. For a demo the build arg is the
 # clearer trade; noted in the README as something to revisit.
 ARG VITE_API_BASE_URL=http://localhost:8080
@@ -31,7 +31,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
 # ---------------------------------------------------------------------------
-# Runtime stage — static files only
+# Runtime stage, static files only
 # ---------------------------------------------------------------------------
 FROM nginx:1.29-alpine AS final
 

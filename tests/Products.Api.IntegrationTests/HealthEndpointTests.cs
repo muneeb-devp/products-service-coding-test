@@ -13,8 +13,7 @@ public sealed class HealthEndpointTests(ProductsApiFactory factory)
     [Fact]
     public async Task Health_is_reachable_without_authentication()
     {
-        // The requirement is explicit that this endpoint is anonymous — an
-        // orchestrator probing it has no credentials to offer.
+        // Explicitly anonymous: an orchestrator probing it has no credentials.
         var response = await factory.CreateClient().GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

@@ -141,7 +141,7 @@ public class GetProductsQueryHandlerTests
     public async Task Handle_leaves_the_colour_filter_unset_when_none_is_supplied()
     {
         // "All products" and "red products" are the same code path with the
-        // filter absent — that is the point of the shared handler.
+        // filter absent, that is the point of the shared handler.
         await _sut.Handle(new GetProductsQuery(), CancellationToken.None);
 
         await _readRepository.Received(1).GetPagedAsync(

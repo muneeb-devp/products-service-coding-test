@@ -7,11 +7,6 @@ namespace Products.Api.IntegrationTests;
 /// <summary>
 /// Covers the product endpoints end to end: real HTTP, real middleware, real SQL.
 /// </summary>
-/// <remarks>
-/// Implements <see cref="IAsyncLifetime"/> so every test starts against an empty
-/// table. xUnit creates a new instance per test, so the reset runs per test and
-/// the tests stay order-independent.
-/// </remarks>
 public sealed class ProductsEndpointTests(ProductsApiFactory factory)
     : IClassFixture<ProductsApiFactory>, IAsyncLifetime
 {
@@ -42,7 +37,7 @@ public sealed class ProductsEndpointTests(ProductsApiFactory factory)
 
         var created = (await response.Content.ReadFromJsonAsync<ProductResponse>())!;
 
-        // The Location header must actually resolve — a header that 404s is
+        // The Location header must actually resolve, a header that 404s is
         // worse than no header at all.
         var followed = await _client.GetAsync(response.Headers.Location);
 
@@ -267,7 +262,7 @@ public sealed class ProductsEndpointTests(ProductsApiFactory factory)
             "/api/products?colour=Red"))!;
 
         // Both spellings reach the same query handler, so their results must be
-        // identical — that is the point of not duplicating the logic.
+        // identical, that is the point of not duplicating the logic.
         viaRoute.Items.Should().BeEquivalentTo(viaQuery.Items);
         viaRoute.TotalCount.Should().Be(1);
     }

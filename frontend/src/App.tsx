@@ -48,7 +48,7 @@ export default function App() {
         setLoadState('loaded')
       } catch (error) {
         // An aborted request means the filter changed and a newer request is
-        // already in flight — not a failure to report.
+        // already in flight, not a failure to report.
         if (error instanceof DOMException && error.name === 'AbortError') return
 
         if (error instanceof ApiError && error.isUnauthorised) {
@@ -99,7 +99,7 @@ export default function App() {
     try {
       const created = await productsApi.create(product)
 
-      setBanner(`Created “${created.name}”.`)
+      setBanner(`Created "${created.name}".`)
       await loadProducts()
     } catch (error) {
       if (error instanceof ApiError) {
@@ -129,7 +129,7 @@ export default function App() {
 
     try {
       await productsApi.remove(product.id)
-      setBanner(`Deleted “${product.name}”.`)
+      setBanner(`Deleted "${product.name}".`)
       await loadProducts()
     } catch (error) {
       setBanner(error instanceof ApiError ? error.userMessage : 'Could not delete the product.')
@@ -221,7 +221,7 @@ export default function App() {
               />
             </div>
 
-            {/* Each state is handled explicitly — a blank screen is never a
+            {/* Each state is handled explicitly, a blank screen is never a
                 valid outcome. */}
             {loadState === 'loading' && (
               <StateMessage variant="loading" title="Loading products…" />

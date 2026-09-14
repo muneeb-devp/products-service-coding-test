@@ -8,11 +8,6 @@ namespace Products.Application;
 /// <summary>
 /// Registers the Application layer with the DI container.
 /// </summary>
-/// <remarks>
-/// Each layer owns its own registration. The API's composition root calls
-/// <c>AddApplication()</c> and <c>AddInfrastructure()</c> without knowing what
-/// either contains, so adding a handler never means editing Program.cs.
-/// </remarks>
 public static class DependencyInjection
 {
     /// <summary>Adds MediatR, the pipeline behaviours and all FluentValidation validators.</summary>
@@ -24,7 +19,7 @@ public static class DependencyInjection
         {
             cfg.RegisterServicesFromAssembly(assembly);
 
-            // Order is significant — behaviours nest in registration order:
+            // Order is significant, behaviours nest in registration order:
             //   Logging  ( Performance ( Validation ( handler ) ) )
             // Logging is outermost so a validation failure is still attributed to
             // its request. Validation is innermost so the handler never runs on

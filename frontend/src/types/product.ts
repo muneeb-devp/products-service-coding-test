@@ -69,9 +69,8 @@ export interface ProductQuery {
 /**
  * An RFC 7807 problem response.
  *
- * `errors` is present on validation failures, keyed by field name — which is
- * what lets the form attach each message to the input that caused it rather
- * than dumping them all at the top.
+ * `errors` is present on validation failures, keyed by field name, so the form
+ * can attach each message to the input that caused it.
  */
 export interface ProblemDetails {
   type?: string

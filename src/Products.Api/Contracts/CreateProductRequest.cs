@@ -6,13 +6,6 @@ namespace Products.Api.Contracts;
 /// <summary>
 /// Request body for creating a product.
 /// </summary>
-/// <remarks>
-/// A transport-layer type distinct from <see cref="CreateProductCommand"/>. It
-/// looks like duplication at this size, and it earns its place the first time
-/// the HTTP contract and the internal command need to diverge — a renamed JSON
-/// field, a deprecated property kept for older clients — without either change
-/// forcing the other.
-/// </remarks>
 /// <param name="Name">Display name. Required, 200 characters or fewer.</param>
 /// <param name="Description">Optional description, 2000 characters or fewer.</param>
 /// <param name="Colour">Colour name, e.g. <c>"Red"</c>. Case-insensitive.</param>

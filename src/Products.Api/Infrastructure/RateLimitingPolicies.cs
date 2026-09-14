@@ -8,12 +8,6 @@ namespace Products.Api.Infrastructure;
 /// <summary>
 /// Named rate-limiting policies and their registration.
 /// </summary>
-/// <remarks>
-/// Limits are applied to the endpoints that need them rather than globally.
-/// Reads are cheap and idempotent; writes mutate state and cost a database round
-/// trip, and the token endpoint is the natural target for credential stuffing.
-/// Throttling reads at the same rate would degrade the frontend for no gain.
-/// </remarks>
 internal static class RateLimitingPolicies
 {
     /// <summary>Policy protecting write endpoints (POST, PUT, DELETE).</summary>
@@ -97,31 +91,12 @@ internal static class RateLimitingPolicies
     /// <summary>
     /// Resolves the configured limits from the request's service scope.
     /// </summary>
-    /// <remarks>
-    /// Resolved here rather than captured at registration time so the values
-    /// come from the fully composed configuration. The limiter for a given
-    /// partition is built once and then cached by the framework, so this is not
-    /// a per-request cost in any meaningful sense.
-    /// </remarks>
     private static RateLimitingOptions GetLimits(HttpContext httpContext) =>
         httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
 
     /// <summary>
     /// Chooses the bucket a request is counted against.
     /// </summary>
-    /// <remarks>
-    /// Authenticated callers are partitioned by identity, which is both more
-    /// precise than an address and immune to NAT lumping unrelated users
-    /// together.
-    /// <para>
-    /// Anonymous callers fall back to the remote address. This only works if the
-    /// address is the <em>client's</em>: behind a load balancer or ingress,
-    /// <c>RemoteIpAddress</c> is the proxy's, so every anonymous user in the
-    /// world would share one bucket and the first ten requests per minute would
-    /// lock out everyone else. Forwarded-header processing is configured in the
-    /// pipeline to keep this honest — see <c>Program.cs</c>.
-    /// </para>
-    /// </remarks>
     private static string GetPartitionKey(HttpContext httpContext) =>
         httpContext.User.Identity?.IsAuthenticated == true
             ? $"user:{httpContext.User.Identity.Name}"

@@ -18,11 +18,6 @@ internal static class TestData
     /// <summary>
     /// Creates a product through the real endpoint and returns the response body.
     /// </summary>
-    /// <remarks>
-    /// Arranged through HTTP rather than by writing to the DbContext directly, so
-    /// the fixture data goes through exactly the validation and normalisation a
-    /// real client's data would.
-    /// </remarks>
     public static async Task<ProductResponse> CreateProductAsync(
         HttpClient client,
         string name = "Ergonomic Desk Lamp",

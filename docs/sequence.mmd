@@ -1,5 +1,5 @@
 %% Example asynchronous flow: placing an order.
-%% Demonstrates eventual consistency — no service calls another synchronously.
+%% Demonstrates eventual consistency, no service calls another synchronously.
 sequenceDiagram
     autonumber
     actor Customer
@@ -13,7 +13,7 @@ sequenceDiagram
     GW->>Orders: create order
     Orders->>Orders: persist Order (Pending)<br/>+ OrderPlaced in the SAME transaction
     Orders-->>GW: 202 Accepted
-    GW-->>Customer: 202 Accepted — order is Pending
+    GW-->>Customer: 202 Accepted, order is Pending
 
     Note over Orders,Broker: A relay publishes the outbox row.<br/>The write and the announcement cannot diverge.
     Orders-)Broker: OrderPlaced

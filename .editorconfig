@@ -1,4 +1,4 @@
-# EditorConfig — https://editorconfig.org
+# EditorConfig, https://editorconfig.org
 root = true
 
 [*]
@@ -48,7 +48,7 @@ csharp_style_prefer_index_operator = true:suggestion
 csharp_prefer_simple_using_statement = true:suggestion
 csharp_prefer_braces = true:suggestion
 
-# this. is noise — the compiler already knows.
+# this. is noise, the compiler already knows.
 dotnet_style_qualification_for_field = false:suggestion
 dotnet_style_qualification_for_property = false:suggestion
 dotnet_style_qualification_for_method = false:suggestion
@@ -84,7 +84,7 @@ dotnet_naming_style.underscore_camel_style.required_prefix = _
 dotnet_naming_style.underscore_camel_style.capitalization = camel_case
 
 #### Analyzer severities ####
-# Treat sloppy async as an error — silent sync-over-async is a production hazard.
+# Treat sloppy async as an error, silent sync-over-async is a production hazard.
 dotnet_diagnostic.CS1998.severity = warning   # async method lacks await
 dotnet_diagnostic.CS4014.severity = error     # un-awaited task
 dotnet_diagnostic.CA2007.severity = none      # ConfigureAwait not needed in ASP.NET Core
@@ -97,7 +97,7 @@ dotnet_diagnostic.CA1707.severity = none      # underscores in test method names
 
 # MediatR notification handlers are named <Event>Handler by convention across
 # the whole .NET ecosystem. CA1711 assumes the suffix means a CLR event
-# handler delegate, which these are not — renaming them would make the code
+# handler delegate, which these are not. Renaming them would make the code
 # less recognisable, not more correct.
 [src/Products.Application/Products/EventHandlers/*.cs]
 dotnet_diagnostic.CA1711.severity = none

@@ -7,14 +7,6 @@ namespace Products.Domain.Products;
 /// <summary>
 /// A product in the catalogue. This is the aggregate root.
 /// </summary>
-/// <remarks>
-/// Every setter is private and the only public constructor is
-/// <see cref="Create"/>. That is deliberate: a <see cref="Product"/> cannot be
-/// brought into existence in an invalid state, and it cannot be mutated into one
-/// afterwards. Callers change it through intention-revealing methods
-/// (<see cref="ChangePrice"/>, <see cref="UpdateDetails"/>) which enforce the
-/// invariants and raise the appropriate domain events.
-/// </remarks>
 public sealed class Product : Entity
 {
     /// <summary>Longest permitted product name.</summary>
@@ -24,7 +16,7 @@ public sealed class Product : Entity
     public const int DescriptionMaxLength = 2_000;
 
     // Required by EF Core for materialisation. EF sets the properties directly
-    // via their backing fields, so this bypasses the invariants by design —
+    // via their backing fields, so this bypasses the invariants by design:
     // rows already in the database were validated on the way in.
     private Product()
     {

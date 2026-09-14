@@ -8,12 +8,6 @@ namespace Products.Application.Common.Behaviours;
 /// <summary>
 /// Warns when a request takes longer than the acceptable threshold.
 /// </summary>
-/// <remarks>
-/// Cheap insurance against the classic slow degradation: a query that starts at
-/// 40ms and reaches 4 seconds as the table grows, with nothing in the logs to
-/// show when it crossed the line. A warning with the elapsed time and request
-/// name gives an alerting rule something concrete to fire on.
-/// </remarks>
 public sealed class PerformanceBehaviour<TRequest, TResponse>(
     ILogger<PerformanceBehaviour<TRequest, TResponse>> logger)
     : IPipelineBehavior<TRequest, TResponse>

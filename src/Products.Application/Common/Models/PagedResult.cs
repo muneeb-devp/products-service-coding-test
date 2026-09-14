@@ -3,11 +3,6 @@ namespace Products.Application.Common.Models;
 /// <summary>
 /// One page of results plus the metadata a client needs to page through the rest.
 /// </summary>
-/// <remarks>
-/// Returning a bare array from a collection endpoint is a latent production
-/// incident: it works on the developer's 20 rows and falls over on the
-/// customer's 2 million. Paging is the default here, not an opt-in.
-/// </remarks>
 /// <typeparam name="T">The item type.</typeparam>
 public sealed record PagedResult<T>
 {

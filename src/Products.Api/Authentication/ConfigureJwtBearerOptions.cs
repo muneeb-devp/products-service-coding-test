@@ -8,16 +8,6 @@ namespace Products.Api.Authentication;
 /// <summary>
 /// Configures JWT bearer validation from <see cref="JwtOptions"/>.
 /// </summary>
-/// <remarks>
-/// Deliberately an <see cref="IConfigureNamedOptions{TOptions}"/> rather than an
-/// inline lambda that reads <c>builder.Configuration</c> during registration.
-/// Reading configuration eagerly at registration time captures whatever happens
-/// to be loaded at that moment, which silently ignores any source added later —
-/// including the overrides a test host supplies. Resolving through the options
-/// system means the values are read when they are used, from the fully composed
-/// configuration, and <c>ValidateOnStart</c> still fails the boot if they are
-/// missing.
-/// </remarks>
 internal sealed class ConfigureJwtBearerOptions(
     IOptions<JwtOptions> jwtOptions,
     IWebHostEnvironment environment) : IConfigureNamedOptions<JwtBearerOptions>

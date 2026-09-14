@@ -6,19 +6,9 @@ namespace Products.Domain.Products;
 /// <summary>
 /// A monetary amount together with the currency it is denominated in.
 /// </summary>
-/// <remarks>
-/// A bare <c>decimal Price</c> is the classic primitive-obsession bug: it lets
-/// you add GBP to USD and get a meaningless number, and it puts the "price must
-/// not be negative" rule in whatever layer happens to remember it. Wrapping the
-/// pair makes the invalid states unrepresentable and gives the rule one home.
-/// <para>
-/// Stored as an EF Core owned type, so it still lands in two ordinary columns
-/// (<c>Price</c>, <c>Currency</c>) rather than a join.
-/// </para>
-/// </remarks>
 public readonly record struct Money
 {
-    /// <summary>Currency codes are ISO 4217 — always three letters.</summary>
+    /// <summary>Currency codes are ISO 4217, always three letters.</summary>
     public const int CurrencyCodeLength = 3;
 
     /// <summary>Currency used when a caller does not specify one.</summary>

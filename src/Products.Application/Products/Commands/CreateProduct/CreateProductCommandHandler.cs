@@ -9,12 +9,6 @@ namespace Products.Application.Products.Commands.CreateProduct;
 /// <summary>
 /// Handles <see cref="CreateProductCommand"/>.
 /// </summary>
-/// <remarks>
-/// The handler is thin by design: input is already validated by the pipeline
-/// behaviour, and the invariants belong to the aggregate. What is left here is
-/// genuine application logic — the uniqueness check, which needs the database
-/// and therefore cannot live in the domain.
-/// </remarks>
 public sealed class CreateProductCommandHandler(
     IProductRepository repository,
     IUnitOfWork unitOfWork,
@@ -51,7 +45,7 @@ public sealed class CreateProductCommandHandler(
 
         await repository.AddAsync(product, cancellationToken);
 
-        // Committing here also dispatches ProductCreatedDomainEvent — after the
+        // Committing here also dispatches ProductCreatedDomainEvent, after the
         // transaction succeeds, never before.
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

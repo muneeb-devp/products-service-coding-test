@@ -8,11 +8,6 @@ namespace Products.Api.OpenApi;
 /// <summary>
 /// Generates one Swagger document per discovered API version.
 /// </summary>
-/// <remarks>
-/// Driven by <see cref="IApiVersionDescriptionProvider"/> rather than a
-/// hardcoded list, so adding <c>[ApiVersion("2.0")]</c> to a controller produces
-/// a v2 document with no change here.
-/// </remarks>
 internal sealed class ConfigureSwaggerOptions(IApiVersionDescriptionProvider provider)
     : IConfigureOptions<SwaggerGenOptions>
 {

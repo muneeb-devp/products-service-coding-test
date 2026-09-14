@@ -1,16 +1,14 @@
 # Architecture
 
-How this Products service fits into a wider event-driven microservices estate,
-and why it is put together the way it is.
-
----
+How this Products service fits into a wider event-driven system, and why it is
+built the way it is.
 
 ## 1. Service topology
 
 ![Architecture diagram](./architecture.png)
 
 <details>
-<summary>Mermaid source (renders inline on GitHub)</summary>
+<summary>Mermaid source</summary>
 
 ```mermaid
 flowchart LR
@@ -22,12 +20,13 @@ flowchart LR
 
     spa["React SPA"]:::client
     partner["Mobile / partner clients"]:::client
+
     gateway["API Gateway / BFF<br/>TLS · authn · routing · quotas"]:::edge
 
     spa --> gateway
     partner --> gateway
 
-    subgraph products_bc["Products — bounded context"]
+    subgraph products_bc["Products (bounded context)"]
         direction TB
         products_api["<b>Products API</b><br/>this repository<br/>Clean Architecture · CQRS"]:::service
         products_db[("Products DB")]:::store
@@ -36,7 +35,7 @@ flowchart LR
         products_api -. same transaction .-> products_outbox
     end
 
-    subgraph orders_bc["Orders — bounded context"]
+    subgraph orders_bc["Orders (bounded context)"]
         direction TB
         orders_api["<b>Orders API</b>"]:::service
         orders_db[("Orders DB")]:::store
@@ -45,7 +44,7 @@ flowchart LR
         orders_api -. same transaction .-> orders_outbox
     end
 
-    subgraph payments_bc["Payments — bounded context"]
+    subgraph payments_bc["Payments (bounded context)"]
         direction TB
         payments_api["<b>Payments API</b>"]:::service
         payments_db[("Payments DB")]:::store
@@ -58,7 +57,7 @@ flowchart LR
     gateway --> orders_api
     gateway --> payments_api
 
-    broker{{"<b>Message broker — RabbitMQ</b><br/>topic exchange · durable queues · DLQ"}}:::broker
+    broker{{"<b>Message broker: RabbitMQ</b><br/>topic exchange · durable queues · DLQ"}}:::broker
 
     products_outbox -- "ProductCreated<br/>ProductPriceChanged" --> broker
     orders_outbox   -- "OrderPlaced<br/>OrderConfirmed / OrderCancelled" --> broker
@@ -74,6 +73,9 @@ flowchart LR
     broker -- "ProductCreated<br/>ProductPriceChanged" --> search
     broker -- "OrderConfirmed<br/>PaymentFailed" --> notify
 
+    %% Neutral backgrounds for the bounded-context groupings, so the colour in
+    %% the diagram carries meaning (service / store / broker) rather than
+    %% decorating the containers.
     style products_bc fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
     style orders_bc   fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
     style payments_bc fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3
@@ -81,27 +83,24 @@ flowchart LR
 
 </details>
 
-### Who publishes what, and who listens
+### Events, publishers and consumers
 
 | Event | Published by | Consumed by | Why the consumer cares |
 |---|---|---|---|
-| `ProductCreated` | Products | Search, Notifications | Index the new item; announce it. |
-| `ProductPriceChanged` | Products | Orders, Search | Orders re-checks baskets against current pricing. |
-| `OrderPlaced` | Orders | Payments | Trigger to take payment. |
-| `PaymentProcessed` | Payments | Orders | Move the order to Confirmed. |
-| `PaymentFailed` | Payments | Orders, Notifications | Cancel the order; tell the customer. |
-| `OrderConfirmed` | Orders | Products, Notifications | Decrement stock; send confirmation. |
-| `OrderCancelled` | Orders | Products | Release reserved stock. |
+| `ProductCreated` | Products | Search, Notifications | Index the new item, announce it |
+| `ProductPriceChanged` | Products | Orders, Search | Orders re-checks baskets against current pricing |
+| `OrderPlaced` | Orders | Payments | Trigger to take payment |
+| `PaymentProcessed` | Payments | Orders | Move the order to Confirmed |
+| `PaymentFailed` | Payments | Orders, Notifications | Cancel the order, tell the customer |
+| `OrderConfirmed` | Orders | Products, Notifications | Decrement stock, send confirmation |
+| `OrderCancelled` | Orders | Products | Release reserved stock |
 
-Each bounded context owns its datastore outright. No service reads another's
-tables. That is the property that makes the boundaries real rather than
-decorative: if Orders could query the Products database, the two would be one
-system with two deployment units — all of the operational cost of microservices
-and none of the independence.
+Each bounded context owns its datastore. No service reads another's tables. That
+is what makes the boundaries real: if Orders could query the Products database,
+the two would be one system in two deployment units, with the operational cost of
+microservices and none of the independence.
 
----
-
-## 2. An asynchronous flow, end to end
+## 2. An asynchronous flow
 
 ![Order sequence diagram](./sequence.png)
 
@@ -122,7 +121,7 @@ sequenceDiagram
     GW->>Orders: create order
     Orders->>Orders: persist Order (Pending)<br/>+ OrderPlaced in the SAME transaction
     Orders-->>GW: 202 Accepted
-    GW-->>Customer: 202 Accepted — order is Pending
+    GW-->>Customer: 202 Accepted, order is Pending
 
     Note over Orders,Broker: A relay publishes the outbox row.<br/>The write and the announcement cannot diverge.
     Orders-)Broker: OrderPlaced
@@ -153,178 +152,146 @@ sequenceDiagram
 
 </details>
 
-The important detail is what is *absent*: at no point does one service call
-another synchronously. Orders does not wait for Payments. Payments does not ask
-Products whether stock exists. Each reacts to a fact that has already happened
-and publishes a fact of its own.
+The notable part is what is absent: no service calls another synchronously.
+Orders does not wait for Payments, and Payments does not ask Products whether
+stock exists. Each reacts to a fact that has already happened and publishes one of
+its own.
 
-The customer receives `202 Accepted` with the order in `Pending`, not `201
-Created` with a confirmed order — the honest answer, because at that instant
-nothing has been paid and no stock has moved. Returning `201 Confirmed` would be
-claiming an outcome the system has not yet reached.
-
----
+The customer gets `202 Accepted` with the order `Pending` rather than `201
+Created`, because at that moment nothing has been paid and no stock has moved.
 
 ## 3. Why events rather than direct calls
 
 **Availability compounds badly in synchronous chains.** If Orders calls Payments
-which calls Products, the flow needs all three up at once. At 99.9% each, the
-chain is about 99.7% — roughly a day of downtime a year that no individual
-service is responsible for. With a broker in between, Payments can be down for
-ten minutes and orders keep being accepted; the queue drains when it returns.
-The work is delayed, not lost.
+which calls Products, the flow needs all three up at once. At 99.9% each that is
+about 99.7%, roughly a day a year of downtime no single service is responsible
+for. With a broker, Payments can be down for ten minutes and orders keep being
+accepted; the queue drains when it returns.
 
 **Load spikes become queue depth instead of failures.** A synchronous chain
-propagates a traffic surge to every downstream service simultaneously, and the
-slowest one decides the user's experience. A queue absorbs the spike and lets
-consumers work at their own rate. Queue depth is also a far better scaling signal
-than CPU — it measures work outstanding rather than effort expended.
+propagates a surge to every downstream service at once, and the slowest decides
+the user's experience. A queue absorbs it and lets consumers work at their own
+rate. Queue depth is also a better scaling signal than CPU, since it measures work
+outstanding rather than effort spent.
 
 **Adding a consumer stops being a change to the producer.** Search and
-Notifications in the diagram subscribe to events Products already publishes.
-Products was not modified, redeployed, or even told. With direct calls, every new
-interested party is a code change and a release in the *producing* service, which
-is how a "microservice" quietly becomes a distributed monolith.
+Notifications subscribe to events Products already publishes. Products was not
+modified or redeployed. With direct calls, every new interested party is a code
+change in the producing service, which is how a set of microservices becomes a
+distributed monolith.
 
-**Temporal decoupling removes a whole class of deployment coupling.** Services can
-be deployed independently because they do not need each other awake at the same
-moment.
+### The costs
 
-### What it costs — honestly
-
-Nothing here is free, and pretending otherwise is how teams end up with a
-distributed system they cannot debug.
-
-- **Eventual consistency is a product decision, not a technical one.** Between
-  `OrderPlaced` and `OrderConfirmed` the order exists and is not paid. The UI has
-  to show that state, support has to understand it, and someone has to decide what
-  happens if it never resolves. That conversation belongs with the product owner
-  before the first line of code.
-- **Every consumer must be idempotent.** Brokers deliver at least once. A
-  redelivered `PaymentProcessed` must not charge twice — hence the "idempotent on
-  OrderId" note in the diagram. This is the single most common source of bugs in
-  event-driven systems, and it is the consumer's problem to solve, every time.
+- **Eventual consistency is a product decision.** Between `OrderPlaced` and
+  `OrderConfirmed` the order exists and is not paid. The UI has to show that,
+  support has to understand it, and someone has to decide what happens if it never
+  resolves.
+- **Every consumer must be idempotent.** Brokers deliver at least once, so a
+  redelivered `PaymentProcessed` must not charge twice. This is the most common
+  source of bugs in event-driven systems and it is the consumer's problem each
+  time.
 - **Debugging spans services.** "Where did this order go" becomes a question
-  across several logs and a broker. Correlation IDs propagated through message
-  headers and distributed tracing are not optional extras; without them the system
-  is genuinely hard to reason about. This service already stamps a `traceId` on
-  every response and log entry for exactly that reason.
+  across several logs and a broker. Correlation IDs in message headers and
+  distributed tracing are not optional. This service already stamps a `traceId` on
+  every response and log entry.
 - **Ordering is not guaranteed across partitions.** Two `ProductPriceChanged`
-  events for the same product can arrive out of order. Either partition by
-  aggregate id, or carry a version and let consumers discard stale updates.
-- **Schema changes are now a contract negotiation.** An event with a published
-  shape is an API. Adding a field is safe; removing or repurposing one breaks
-  consumers you may not know about.
+  events for one product can arrive out of order. Either partition by aggregate id
+  or carry a version and discard stale updates.
+- **Event schemas are contracts.** Adding a field is safe; removing or
+  repurposing one breaks consumers you may not know about.
 
 ### Where synchronous calls still win
 
-Events are not universally correct. Query paths that need an immediate, consistent
-answer — "is this token valid", "what is this product right now" — should stay
-synchronous request/response. The gateway calling Products over HTTP for a read is
-the right design; it is only *state changes that fan out* which benefit from
-events. Using a broker for a simple lookup adds latency and failure modes for
-nothing.
+Query paths needing an immediate consistent answer ("is this token valid", "what
+is this product right now") should stay request/response. The gateway calling
+Products over HTTP for a read is correct. It is state changes that fan out which
+benefit from events; using a broker for a lookup adds latency and failure modes
+for nothing.
 
----
+## 4. RabbitMQ or Kafka
 
-## 4. RabbitMQ or Kafka?
+The diagram shows RabbitMQ:
 
-The diagram shows **RabbitMQ**, for reasons specific to this workload:
-
-- The traffic is business events at human scale — thousands per minute, not
-  millions per second. Kafka's throughput advantage buys nothing here.
+- Traffic is business events at human scale, thousands per minute rather than
+  millions per second, so Kafka's throughput advantage buys nothing.
 - The interaction is competing consumers on a work queue, which is RabbitMQ's
-  native model. Kafka's consumer-group-per-partition model is more machinery than
-  this needs.
+  native model.
 - Per-message acknowledgement, dead-letter queues and delayed retry are built in.
-  On Kafka these are patterns you assemble yourself.
-- Operationally it is far lighter, which matters when the team is small.
+  On Kafka these are patterns you assemble.
+- It is operationally lighter, which matters with a small team.
 
-**Kafka would be the better answer** if requirements changed in specific ways: if
-events needed to be retained and replayed to rebuild a read model from scratch; if
-the system moved to genuine event sourcing where the log *is* the source of truth;
-if throughput reached the hundreds of thousands per second; or if a stream
-processing layer were wanted over the event history.
+Kafka would be the better answer if events needed retaining and replaying to
+rebuild a read model, if the system moved to event sourcing where the log is the
+source of truth, if throughput reached hundreds of thousands per second, or if a
+stream processing layer were wanted over the history.
 
-That is the real trade: RabbitMQ is a message broker — once delivered and
-acknowledged, a message is gone. Kafka is a durable, replayable log. Replay is the
-deciding capability, not throughput.
-
----
+The real trade is that RabbitMQ is a broker (once acknowledged, a message is gone)
+whereas Kafka is a durable replayable log. Replay is the deciding capability, not
+throughput.
 
 ## 5. How this service already fits
 
-The Products API in this repository is not a monolith with microservice
-aspirations bolted on. The seam is already present and load-bearing.
+The seam is present and working.
 
-**Domain events exist and are raised by the aggregate.** `Product.Create` raises
+**Domain events are raised by the aggregate.** `Product.Create` raises
 `ProductCreatedDomainEvent`; `ChangePrice` raises `ProductPriceChangedDomainEvent`
-carrying *both* the old and new price, because a consumer needs the delta and
-cannot reconstruct it from the new state alone. That is the difference between an
-event and a state notification.
+carrying both old and new price, because a consumer needs the delta and cannot
+reconstruct it from the new state.
 
-**They are dispatched after the transaction commits.** `ProductsDbContext.SaveChangesAsync`
-collects pending events, saves, then dispatches. No handler can react to a change
-that is subsequently rolled back.
+**They are dispatched after commit.** `ProductsDbContext.SaveChangesAsync`
+collects pending events, saves, then dispatches, so no handler reacts to a change
+that is later rolled back.
 
-**The domain does not know how they are delivered.** `IDomainEvent` carries no
-MediatR reference. An Application-layer wrapper adapts it to a MediatR
-notification. Publishing to a broker instead changes that one adapter.
+**The domain does not know how they are delivered.** `IDomainEvent` has no MediatR
+reference; an Application-layer wrapper adapts it. Publishing to a broker instead
+changes that one adapter.
 
-### What it would take to publish for real
+### What publishing for real would take
 
-The handler that today writes a log line is the extension point:
+The handler that currently logs is the extension point:
 
 ```csharp
 // Products.Application/Products/EventHandlers/ProductCreatedDomainEventHandler.cs
 public Task Handle(DomainEventNotification<ProductCreatedDomainEvent> notification, ...)
 {
     // Today: a log line.
-    // In production: write a ProductCreated integration event to the outbox,
+    // Production: write a ProductCreated integration event to the outbox,
     // in the same transaction as the product itself.
 }
 ```
 
-The remaining work is three pieces:
+Three pieces remain:
 
-1. **An outbox table** in the Products database, written in the same transaction
+1. An **outbox table** in the Products database, written in the same transaction
    as the product.
-2. **A relay** — a background service polling unpublished rows and publishing them,
-   marking them sent.
-3. **An integration event contract** versioned separately from the domain event.
-   The domain event is internal and may be refactored freely; the integration
-   event is a published API and may not.
+2. A **relay** polling unpublished rows, publishing them and marking them sent.
+3. An **integration event contract** versioned separately from the domain event.
+   The domain event is internal and can be refactored; the integration event is a
+   published API and cannot.
 
-### Why the outbox, specifically
+### Why the outbox
 
-Publishing straight to the broker from that handler would be a **dual write**: two
-systems changed with no transaction spanning them. If the database commits and the
-broker publish then fails, the product exists and nothing downstream ever hears
-about it. Search never indexes it. No error is raised, because from the API's point
-of view the request succeeded. The inconsistency is silent and permanent, and it is
-usually found weeks later by a human noticing something missing.
+Publishing straight to the broker from that handler would be a dual write: two
+systems changed with no transaction across them. If the database commits and the
+publish then fails, the product exists and nothing downstream hears about it.
+Search never indexes it, and no error is raised, because from the API's point of
+view the request succeeded. The inconsistency is silent and permanent.
 
 Writing the event to the same database in the same transaction makes "saved" and
-"will be announced" atomic. A separate relay then guarantees delivery, retrying
-until the broker acknowledges. The cost is that delivery is at-least-once — which
-is why every consumer must be idempotent, and why that requirement appears twice in
-this document.
+"will be announced" atomic, and a relay guarantees delivery by retrying until the
+broker acknowledges. The cost is at-least-once delivery, which is why consumers
+must be idempotent.
 
----
+## 6. What production would also need
 
-## 6. What else production would need
-
-Deliberately out of scope for a coding exercise, but part of the honest picture:
-
-- **A real identity provider.** The `/api/auth/token` endpoint is a stand-in.
-  Production would use Azure AD / Auth0 / IdentityServer, asymmetric signing
-  (RS256) with public keys published via JWKS, so the API holds only a verification
-  key and never one that can mint tokens.
-- **Distributed tracing** with OpenTelemetry, propagated through message headers so
-  a trace survives the hop through the broker.
-- **Schema registry** for event contracts, with compatibility checks in CI.
-- **Kubernetes manifests** with the liveness and readiness probes this service
-  already exposes — readiness includes the database, liveness deliberately does not,
-  because restarting a process does not fix a database outage.
-- **Migrations as a deployment step**, not at application start-up, so that N
-  replicas do not race to migrate the same schema.
+- **A real identity provider.** `/api/auth/token` is a stand-in. Production would
+  use Azure AD, Auth0 or IdentityServer with RS256 and keys published via JWKS, so
+  the API holds only a verification key.
+- **Distributed tracing** with OpenTelemetry, propagated through message headers
+  so a trace survives the broker hop.
+- **A schema registry** for event contracts, with compatibility checks in CI.
+- **Kubernetes manifests** using the liveness and readiness probes this service
+  already exposes. Readiness includes the database; liveness does not, because
+  restarting a process does not fix a database outage.
+- **Migrations as a deployment step** rather than at application start-up, so
+  replicas do not race to migrate one schema.

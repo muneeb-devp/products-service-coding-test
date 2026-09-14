@@ -48,14 +48,9 @@ try
     await app.RunAsync();
     return 0;
 }
-// HostAbortedException is a normal Ctrl+C / SIGTERM shutdown, not a failure.
-//
-// StopTheHostException is thrown by the hosting infrastructure that
-// WebApplicationFactory uses to capture the built host and stop before Run().
-// It is internal, hence the name check. Swallowing it here would leave the test
-// host with no IHost at all, and the whole integration suite fails with "the
-// entry point exited without ever building an IHost" — which looks like a test
-// problem and is actually this catch block.
+// HostAbortedException is a normal shutdown. StopTheHostException is internal
+// to the hosting infrastructure WebApplicationFactory uses to grab the built
+// host; swallowing it breaks every integration test.
 catch (Exception ex) when (
     ex is not HostAbortedException &&
     ex.GetType().Name is not "StopTheHostException")
@@ -131,8 +126,8 @@ internal static class ApiStartup
 
             // KnownIPNetworks/KnownProxies default to loopback only. In a real
             // deployment these must name the actual proxy, otherwise the headers
-            // are ignored — or, if cleared without naming a proxy, any client
-            // could spoof X-Forwarded-For and escape its own rate-limit bucket.
+            // are ignored. Cleared without naming a real proxy, any client can
+            // spoof X-Forwarded-For to escape its own rate-limit bucket.
             options.KnownIPNetworks.Clear();
             options.KnownProxies.Clear();
         });
@@ -144,11 +139,6 @@ internal static class ApiStartup
     /// <summary>
     /// Binds an options type and validates it at start-up.
     /// </summary>
-    /// <remarks>
-    /// <c>ValidateOnStart</c> is the important part. Without it, a missing
-    /// signing key is discovered by the first user who tries to authenticate; with
-    /// it, the process refuses to start and the deployment fails instead.
-    /// </remarks>
     private static IServiceCollection AddOptionsWithValidation<TOptions>(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -268,8 +258,8 @@ internal static class ApiStartup
     public static async Task ConfigurePipelineAsync(this WebApplication app)
     {
         // First: rewrites the client address and scheme from the forwarded
-        // headers, so every later component — logging, rate limiting, HTTPS
-        // redirection — sees the real client rather than the proxy.
+        // headers, so logging, rate limiting and HTTPS redirection all see the
+        // real client rather than the proxy.
         app.UseForwardedHeaders();
 
         // Then the exception handler, so it catches everything after it.
@@ -346,7 +336,7 @@ internal static class ApiStartup
         }).AllowAnonymous();
 
         // Liveness: deliberately excludes the database. If the database is down,
-        // restarting this process does not help — a failing liveness probe would
+        // restarting this process does not help; a failing liveness probe would
         // just crash-loop a healthy service.
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
@@ -376,7 +366,7 @@ internal static class ApiStartup
                 status = entry.Value.Status.ToString(),
                 durationMs = entry.Value.Duration.TotalMilliseconds,
 
-                // The exception message is withheld on purpose — /health is
+                // The exception message is withheld on purpose, /health is
                 // anonymous, and a failed database check would otherwise publish
                 // connection details to anyone who asks.
                 description = entry.Value.Description,
@@ -404,10 +394,4 @@ internal static class ApiStartup
 /// Exposed so the integration tests can drive the real pipeline through
 /// <c>WebApplicationFactory&lt;Program&gt;</c>.
 /// </summary>
-/// <remarks>
-/// Top-level statements generate an internal Program class. Testing against the
-/// genuine start-up path — real middleware, real DI, real auth — is worth far
-/// more than a test host assembled separately in the test project, which would
-/// verify a pipeline that does not ship.
-/// </remarks>
 public partial class Program;

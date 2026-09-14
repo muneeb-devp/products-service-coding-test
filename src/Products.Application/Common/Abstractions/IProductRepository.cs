@@ -6,18 +6,6 @@ namespace Products.Application.Common.Abstractions;
 /// The <em>write</em> side of the Products store: loads and persists whole
 /// aggregates.
 /// </summary>
-/// <remarks>
-/// Deliberately narrow. It deals in <see cref="Product"/> aggregates rather than
-/// projections, and it exposes no <c>IQueryable</c> — leaking an
-/// <c>IQueryable</c> would let query composition (and therefore EF Core's
-/// translation rules) bleed into the Application layer, which is exactly the
-/// coupling Clean Architecture is meant to prevent.
-/// <para>
-/// Reads are served by <see cref="IProductReadRepository"/>. Splitting the two
-/// is the practical payoff of CQRS: the write side can stay change-tracked and
-/// aggregate-shaped while the read side projects straight to DTOs.
-/// </para>
-/// </remarks>
 public interface IProductRepository
 {
     /// <summary>Loads a product for modification, or <see langword="null"/> if absent.</summary>

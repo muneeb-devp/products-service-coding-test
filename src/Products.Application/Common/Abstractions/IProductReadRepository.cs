@@ -6,12 +6,6 @@ namespace Products.Application.Common.Abstractions;
 /// <summary>
 /// The <em>read</em> side of the Products store: projects straight to DTOs.
 /// </summary>
-/// <remarks>
-/// Returning DTOs rather than entities is what makes this worth separating.
-/// The implementation can project in the database (<c>SELECT</c> only the
-/// columns the DTO needs) and skip EF's change tracker entirely, neither of
-/// which is available if the read path has to hydrate full aggregates first.
-/// </remarks>
 public interface IProductReadRepository
 {
     /// <summary>

@@ -6,13 +6,6 @@ namespace Products.Application.Products.Commands.CreateProduct;
 /// <summary>
 /// Validates <see cref="CreateProductCommand"/> at the application boundary.
 /// </summary>
-/// <remarks>
-/// These rules deliberately mirror the domain invariants rather than replacing
-/// them. The validator exists to turn bad <em>input</em> into a helpful 400 with
-/// every problem listed at once; the domain guards exist so the aggregate cannot
-/// be corrupted by any caller, validated or not. Belt and braces, and the two
-/// serve different audiences.
-/// </remarks>
 public sealed class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
 {
     public CreateProductCommandValidator()
@@ -45,7 +38,7 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
         // Deliberately a separate chain. FluentValidation applies .When() to
         // every rule that precedes it in the same chain, so folding this into
         // the NotEmpty() chain above would switch the "required" rule off in
-        // exactly the case it exists to catch — an absent SKU.
+        // exactly the case it exists to catch: an absent SKU.
         RuleFor(x => x.Sku)
             .Must(sku => Sku.TryCreate(sku, out _))
                 .WithMessage(

@@ -35,7 +35,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 
 # curl is here solely for the container healthcheck. The ASP.NET runtime image
 # ships neither curl nor wget, and a HEALTHCHECK that cannot run is worse than
-# none — the container reports healthy because nothing ever contradicts it.
+# none: the container reports healthy because nothing ever contradicts it.
 RUN apt-get update \
     && apt-get install --no-install-recommends -y curl \
     && rm -rf /var/lib/apt/lists/*
@@ -56,8 +56,8 @@ ENV ASPNETCORE_URLS=http://+:8080 \
 EXPOSE 8080
 
 # Runs as the unprivileged `app` user the base image provides. A container
-# process running as root shares the host kernel — a container escape is then
-# a root escape.
+# process running as root shares the host kernel, so a container escape
+# becomes a root escape.
 USER app
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \

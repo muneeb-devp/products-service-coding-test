@@ -9,18 +9,6 @@ namespace Products.Api.Authentication;
 /// <summary>
 /// Issues short-lived HS256 JWTs.
 /// </summary>
-/// <remarks>
-/// This is a <strong>stand-in for a real identity provider</strong>. It exists
-/// so a reviewer can exercise the secured endpoints without standing up Azure
-/// AD, Auth0 or IdentityServer first.
-/// <para>
-/// What a production deployment would change: tokens would be issued by the IdP,
-/// not by this service; signing would use asymmetric keys (RS256/ES256) with the
-/// public half published via JWKS, so the API only ever holds a verification
-/// key and never a key that can mint tokens; and there would be a real user
-/// store behind the credential check. See README → How authentication works.
-/// </para>
-/// </remarks>
 public sealed class JwtTokenService(
     IOptions<JwtOptions> options,
     TimeProvider timeProvider) : ITokenService

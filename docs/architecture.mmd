@@ -15,7 +15,7 @@ flowchart LR
     spa --> gateway
     partner --> gateway
 
-    subgraph products_bc["Products — bounded context"]
+    subgraph products_bc["Products (bounded context)"]
         direction TB
         products_api["<b>Products API</b><br/>this repository<br/>Clean Architecture · CQRS"]:::service
         products_db[("Products DB")]:::store
@@ -24,7 +24,7 @@ flowchart LR
         products_api -. same transaction .-> products_outbox
     end
 
-    subgraph orders_bc["Orders — bounded context"]
+    subgraph orders_bc["Orders (bounded context)"]
         direction TB
         orders_api["<b>Orders API</b>"]:::service
         orders_db[("Orders DB")]:::store
@@ -33,7 +33,7 @@ flowchart LR
         orders_api -. same transaction .-> orders_outbox
     end
 
-    subgraph payments_bc["Payments — bounded context"]
+    subgraph payments_bc["Payments (bounded context)"]
         direction TB
         payments_api["<b>Payments API</b>"]:::service
         payments_db[("Payments DB")]:::store
@@ -46,7 +46,7 @@ flowchart LR
     gateway --> orders_api
     gateway --> payments_api
 
-    broker{{"<b>Message broker — RabbitMQ</b><br/>topic exchange · durable queues · DLQ"}}:::broker
+    broker{{"<b>Message broker: RabbitMQ</b><br/>topic exchange · durable queues · DLQ"}}:::broker
 
     products_outbox -- "ProductCreated<br/>ProductPriceChanged" --> broker
     orders_outbox   -- "OrderPlaced<br/>OrderConfirmed / OrderCancelled" --> broker

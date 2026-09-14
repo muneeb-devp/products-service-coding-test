@@ -14,7 +14,7 @@
     <MicrosoftExtensionsVersion>10.0.10</MicrosoftExtensionsVersion>
   </PropertyGroup>
 
-  <ItemGroup Label="Application — CQRS &amp; validation">
+  <ItemGroup Label="Application, CQRS &amp; validation">
     <!-- MediatR pinned to 12.5.0: the last release under the Apache-2.0 licence.
          13.x+ moved to a paid commercial licence. See README → Design Decisions. -->
     <PackageVersion Include="MediatR" Version="12.5.0" />
@@ -22,7 +22,7 @@
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
   </ItemGroup>
 
-  <ItemGroup Label="Infrastructure — persistence">
+  <ItemGroup Label="Infrastructure, persistence">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(MicrosoftExtensionsVersion)" />
@@ -31,7 +31,7 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftExtensionsVersion)" />
   </ItemGroup>
 
-  <ItemGroup Label="API — hosting, auth, docs, versioning">
+  <ItemGroup Label="API, hosting, auth, docs, versioning">
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
@@ -44,7 +44,7 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
-  <ItemGroup Label="Transitive pins — security">
+  <ItemGroup Label="Transitive pins, security">
     <!--
       Microsoft.EntityFrameworkCore.Sqlite pulls SQLitePCLRaw.lib.e_sqlite3
       2.1.11 transitively, which carries a known high-severity advisory

@@ -32,28 +32,6 @@ public sealed class ProductsDbContext(
     /// <summary>
     /// Commits the transaction, then dispatches any domain events raised during it.
     /// </summary>
-    /// <remarks>
-    /// The ordering is the important part, and it is deliberate:
-    /// <list type="number">
-    ///   <item>Collect the pending events <em>before</em> saving. Deleted
-    ///         entities leave the change tracker once the save completes, so
-    ///         their events would be lost if collected afterwards.</item>
-    ///   <item>Save. If this throws, no event is dispatched and no handler ever
-    ///         observes a change that was rolled back.</item>
-    ///   <item>Clear the aggregates' event logs, so a second call to
-    ///         SaveChanges cannot redeliver the same events.</item>
-    ///   <item>Dispatch.</item>
-    /// </list>
-    /// <para>
-    /// Dispatch happens after the commit, which means a handler failure cannot
-    /// roll back the write — the product stays saved. That is the correct
-    /// trade-off here (the write is the source of truth), but it is precisely
-    /// why a production system publishes integration events through a
-    /// transactional outbox instead: the event is written in the same
-    /// transaction, and a separate relay guarantees delivery. See
-    /// <c>docs/architecture.md</c>.
-    /// </para>
-    /// </remarks>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var aggregatesWithEvents = ChangeTracker
@@ -99,18 +77,6 @@ public sealed class ProductsDbContext(
     /// <summary>
     /// Whether a failed save was caused by a unique-constraint violation.
     /// </summary>
-    /// <remarks>
-    /// The provider reports this through a numeric code on the inner exception,
-    /// and the codes differ per provider, so both supported providers are
-    /// covered explicitly:
-    /// <list type="bullet">
-    ///   <item>SQL Server — 2601 (unique index) and 2627 (unique constraint).</item>
-    ///   <item>SQLite — 19 (SQLITE_CONSTRAINT) and the extended code 2067
-    ///         (SQLITE_CONSTRAINT_UNIQUE).</item>
-    /// </list>
-    /// Matching on the message text instead would break the moment the server
-    /// runs under a different locale.
-    /// </remarks>
     private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
         exception.InnerException switch
         {

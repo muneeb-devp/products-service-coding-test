@@ -15,20 +15,6 @@ namespace Products.Api.IntegrationTests;
 /// <summary>
 /// Boots the real API in memory for integration testing.
 /// </summary>
-/// <remarks>
-/// The only thing replaced is the database connection. Everything else — the
-/// middleware order, the JSON options, authentication, model binding, the
-/// MediatR pipeline, the exception handler — is the pipeline that actually
-/// ships. A hand-assembled test host would verify a pipeline no user ever hits.
-/// <para>
-/// The database is SQLite over a shared in-memory connection rather than EF's
-/// InMemory provider. InMemory is not a relational database: it silently ignores
-/// unique indexes, column lengths and SQL translation. A test suite running on
-/// it would pass while the duplicate-SKU constraint and the colour-filter SQL
-/// were both broken. SQLite exercises real SQL and real constraints, and the
-/// schema comes from the same migrations production uses.
-/// </para>
-/// </remarks>
 public class ProductsApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     /// <summary>Username the test host accepts at the demo token endpoint.</summary>
@@ -38,24 +24,18 @@ public class ProductsApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public const string TestPassword = "test-password-123!";
 
     // Held open for the lifetime of the factory. A SQLite in-memory database
-    // exists only while a connection to it is open — let this close and the
+    // exists only while a connection to it is open, let this close and the
     // schema vanishes mid-test-run.
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
 
     // One token reused across the class. Requesting a fresh one per test would
-    // run the suite straight into the token endpoint's own rate limit — which is
+    // run the suite straight into the token endpoint's own rate limit, which is
     // a correct limit, not a bug to work around.
     private string? _cachedToken;
 
     /// <summary>
     /// Rate limits applied to this host.
     /// </summary>
-    /// <remarks>
-    /// Overridden by the rate-limiting tests, which need limits low enough to
-    /// trip deliberately. Everywhere else they are raised well clear of the
-    /// suite's traffic, so the functional tests exercise business behaviour
-    /// rather than racing a throttle.
-    /// </remarks>
     protected virtual (int WritePermits, int AuthPermits) RateLimits => (10_000, 10_000);
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -127,11 +107,6 @@ public class ProductsApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>Obtains a token from the real token endpoint.</summary>
-    /// <remarks>
-    /// Deliberately goes through the HTTP endpoint rather than calling the token
-    /// service directly. That way the tests exercise the same path a client
-    /// uses, and a broken token endpoint fails loudly instead of being bypassed.
-    /// </remarks>
     public static async Task<string> RequestTokenAsync(HttpClient client)
     {
         var response = await client.PostAsJsonAsync(
@@ -149,11 +124,6 @@ public class ProductsApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>
     /// Empties the Products table so each test starts from a known state.
     /// </summary>
-    /// <remarks>
-    /// Tests share one factory (and therefore one database) per class for speed.
-    /// Resetting between them keeps them independent, so they can run in any
-    /// order and a failure points at one test rather than at whichever ran first.
-    /// </remarks>
     public async Task ResetDatabaseAsync()
     {
         using var scope = Services.CreateScope();

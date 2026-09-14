@@ -29,7 +29,7 @@ export function SignInPanel({ onSignIn, error, isSubmitting }: SignInPanelProps)
 
       <p className="mt-1 text-sm text-slate-600">
         The API requires a bearer token. This exchanges the demo credentials for a short-lived
-        JWT — standing in for a real identity provider.
+        JWT, standing in for a real identity provider.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">

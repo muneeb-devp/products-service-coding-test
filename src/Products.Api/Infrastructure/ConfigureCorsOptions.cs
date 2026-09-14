@@ -12,21 +12,12 @@ public sealed class CorsSettings
     /// <summary>
     /// Exact origins allowed, e.g. <c>https://app.example.com</c>.
     /// </summary>
-    /// <remarks>
-    /// An empty list means no cross-origin access, not "allow everything". A
-    /// permissive default is how a development convenience reaches production.
-    /// </remarks>
     public string[] AllowedOrigins { get; init; } = [];
 }
 
 /// <summary>
 /// Builds the CORS policy from <see cref="CorsSettings"/>.
 /// </summary>
-/// <remarks>
-/// Configured through the options system for the same reason as JWT bearer: so
-/// the origins come from the fully composed configuration rather than from
-/// whatever was loaded at registration time.
-/// </remarks>
 internal sealed class ConfigureCorsOptions(IOptions<CorsSettings> settings)
     : IConfigureOptions<CorsOptions>
 {

@@ -7,14 +7,6 @@ namespace Products.Infrastructure.Persistence;
 /// <summary>
 /// Brings the database up to date at start-up and seeds demo data.
 /// </summary>
-/// <remarks>
-/// Running migrations from application start-up is a deliberate convenience for
-/// a reviewable take-home: <c>docker compose up</c> yields a working, populated
-/// API with no extra step. In production this belongs in a separate migration
-/// job run before the new version starts, so that N application instances do not
-/// race to migrate the same schema and so a failed migration stops the deploy
-/// rather than crash-looping the service. Noted in README → Design Decisions.
-/// </remarks>
 public sealed class ProductsDbContextInitialiser(
     ProductsDbContext context,
     ILogger<ProductsDbContextInitialiser> logger)
@@ -45,10 +37,6 @@ public sealed class ProductsDbContextInitialiser(
     /// <summary>
     /// Seeds a small demo catalogue, but only when the table is empty.
     /// </summary>
-    /// <remarks>
-    /// The emptiness check makes this idempotent: restarting the service must
-    /// not duplicate the seed rows, and it must never overwrite real data.
-    /// </remarks>
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
         if (await context.Products.AnyAsync(cancellationToken))
@@ -77,7 +65,7 @@ public sealed class ProductsDbContextInitialiser(
 
         // These rows are demo fixtures, not genuine business activity, so drop
         // the ProductCreated events the factory raised. Casting to DbContext to
-        // "avoid the override" would not work — SaveChangesAsync is virtual, so
+        // "avoid the override" would not work: SaveChangesAsync is virtual, so
         // the override runs regardless of the static type.
         foreach (var product in seed)
         {

@@ -9,13 +9,6 @@ namespace Products.Application.Products.Queries.GetProducts;
 /// <summary>
 /// Returns a page of products, optionally filtered by colour.
 /// </summary>
-/// <remarks>
-/// One query serves both "all products" and "products of a specific colour".
-/// The brief asks for a way to retrieve products of one colour; making that an
-/// optional filter on the existing query — rather than a second endpoint with a
-/// second handler — means paging, sorting and projection have exactly one
-/// implementation and cannot drift apart.
-/// </remarks>
 /// <param name="Page">1-based page number. Defaults to 1.</param>
 /// <param name="PageSize">Items per page. Defaults to 20, capped at 100.</param>
 /// <param name="Colour">Optional colour filter; <see langword="null"/> returns every colour.</param>

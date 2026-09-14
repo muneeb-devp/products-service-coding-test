@@ -6,19 +6,6 @@ namespace Products.Application.Common;
 /// <summary>
 /// Source-generated log messages for the Application layer.
 /// </summary>
-/// <remarks>
-/// Using <see cref="LoggerMessageAttribute"/> rather than calling
-/// <c>logger.LogInformation(...)</c> directly has two concrete benefits:
-/// <list type="number">
-///   <item>The message template and its arguments are checked at <em>compile
-///         time</em>, so a placeholder that does not match its argument is a
-///         build error rather than a malformed log line found in production.</item>
-///   <item>No boxing and no argument evaluation when the level is disabled —
-///         the generated code checks <c>IsEnabled</c> first.</item>
-/// </list>
-/// Collecting them in one place also makes the service's log vocabulary
-/// reviewable: every event id and template is visible in a single file.
-/// </remarks>
 internal static partial class ApplicationLog
 {
     [LoggerMessage(

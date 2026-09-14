@@ -25,11 +25,6 @@ public static class DependencyInjection
     /// Adds the DbContext, repositories, domain event dispatcher and the
     /// database health check.
     /// </summary>
-    /// <remarks>
-    /// The provider is selected from configuration rather than compiled in, so
-    /// moving from the SQLite file used for local development to SQL Server is
-    /// a connection string and one setting — no code change and no rebuild.
-    /// </remarks>
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -100,9 +95,9 @@ public static class DependencyInjection
 /// <summary>Supported database provider names.</summary>
 public static class DatabaseProvider
 {
-    /// <summary>SQLite — the default, used for local development and tests.</summary>
+    /// <summary>SQLite. The default, used for local development and tests.</summary>
     public const string Sqlite = "Sqlite";
 
-    /// <summary>SQL Server — the intended production provider.</summary>
+    /// <summary>SQL Server. The intended production provider.</summary>
     public const string SqlServer = "SqlServer";
 }

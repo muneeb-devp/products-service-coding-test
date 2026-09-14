@@ -26,8 +26,8 @@ interface RequestOptions {
  *
  * Centralising it means the bearer header, JSON encoding, problem-details
  * parsing and error mapping are written once and behave identically everywhere.
- * Scattering `fetch` through components would mean each one handles — or, more
- * often, forgets to handle — its own errors.
+ * Scattering `fetch` through components means each one handles (or forgets to
+ * handle) its own errors.
  */
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, authenticated = true, signal } = options
@@ -55,8 +55,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       signal,
     })
   } catch (error) {
-    // An aborted request is the caller changing their mind, not a failure —
-    // rethrow so the caller can ignore it rather than showing an error.
+    // An aborted request is the caller changing their mind, not a failure.
+    // Rethrow so the caller can ignore it instead of showing an error.
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw error
     }

@@ -10,17 +10,6 @@ namespace Products.Infrastructure.Persistence;
 /// time, so migrations can be generated from the Infrastructure project without
 /// booting the API.
 /// </summary>
-/// <remarks>
-/// Without this, <c>dotnet ef</c> has to start the whole web host — which means
-/// design-time tooling depends on the API's configuration, its secrets and its
-/// start-up succeeding. Keeping migrations runnable from the project that owns
-/// them is both faster and less brittle.
-/// <para>
-/// The connection string here is used only to pick the provider and build the
-/// model. Migrations are generated from the model, not from the database, so
-/// this never touches the real one.
-/// </para>
-/// </remarks>
 internal sealed class ProductsDbContextFactory : IDesignTimeDbContextFactory<ProductsDbContext>
 {
     public ProductsDbContext CreateDbContext(string[] args)

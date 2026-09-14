@@ -9,11 +9,6 @@ namespace Products.Infrastructure.Persistence.Repositories;
 /// <summary>
 /// EF Core implementation of the read-side product store.
 /// </summary>
-/// <remarks>
-/// Every query here is <c>AsNoTracking</c>. Read requests never mutate
-/// anything, so paying for change-tracking snapshots on each row is wasted work
-/// and wasted memory on the hot path.
-/// </remarks>
 internal sealed class ProductReadRepository(ProductsDbContext context) : IProductReadRepository
 {
     /// <inheritdoc />
@@ -24,7 +19,7 @@ internal sealed class ProductReadRepository(ProductsDbContext context) : IProduc
         var query = context.Products.AsNoTracking();
 
         // The colour filter is optional. When absent this is simply "all
-        // products" — one code path, one set of SQL, whether or not a filter
+        // products", one code path, one set of SQL, whether or not a filter
         // was supplied.
         if (options.Colour.HasValue)
         {
@@ -81,19 +76,6 @@ internal sealed class ProductReadRepository(ProductsDbContext context) : IProduc
     /// <summary>
     /// Translates the validated sort field onto a typed expression.
     /// </summary>
-    /// <remarks>
-    /// A switch over a closed set, not string-to-column concatenation. The sort
-    /// field arrives from the query string; the validator already restricts it
-    /// to an allow-list, and this switch means an unrecognised value falls back
-    /// to the default ordering rather than reaching the database as text.
-    /// <para>
-    /// The secondary sort on <c>Id</c> is not decoration. Paging over a
-    /// non-unique sort key (several products sharing a price, say) has no
-    /// defined row order between pages, so the same row can appear on page 1 and
-    /// again on page 2 while another is skipped entirely. Appending a unique
-    /// tiebreaker makes the ordering total and the paging stable.
-    /// </para>
-    /// </remarks>
     private static IQueryable<Product> ApplySort(
         IQueryable<Product> query,
         ProductQueryOptions options)

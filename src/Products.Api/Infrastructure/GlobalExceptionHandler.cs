@@ -9,20 +9,6 @@ namespace Products.Api.Infrastructure;
 /// <summary>
 /// Converts unhandled exceptions into RFC 7807 <c>ProblemDetails</c> responses.
 /// </summary>
-/// <remarks>
-/// Implemented as <see cref="IExceptionHandler"/> rather than hand-written
-/// middleware. It is the framework's supported extension point since .NET 8,
-/// participates in <c>AddProblemDetails</c> so every error response is shaped
-/// consistently, and it keeps the mapping table in one readable place instead of
-/// spread through try/catch blocks in controllers.
-/// <para>
-/// The key security property: only <em>known</em> exception types have their
-/// message copied into the response. Anything unrecognised becomes a generic
-/// "An unexpected error occurred", because exception messages routinely contain
-/// connection strings, file paths and schema details. The real detail goes to
-/// the log, correlated by trace id, where it is useful without being public.
-/// </para>
-/// </remarks>
 internal sealed class GlobalExceptionHandler(
     ILogger<GlobalExceptionHandler> logger,
     IProblemDetailsService problemDetailsService) : IExceptionHandler
@@ -89,7 +75,7 @@ internal sealed class GlobalExceptionHandler(
             },
 
             // Domain guards. Reaching one means input bypassed a validator, so
-            // it is still the caller's fault — 400, not 500.
+            // it is still the caller's fault, so 400 rather than 500.
             DomainValidationException domain => new ValidationProblemDetails(
                 new Dictionary<string, string[]>(StringComparer.Ordinal)
                 {
@@ -111,8 +97,8 @@ internal sealed class GlobalExceptionHandler(
                 Instance = context.Request.Path,
             },
 
-            // Well-formed request, but it conflicts with current state — a
-            // duplicate SKU. 400 would wrongly suggest a malformed payload.
+            // Well-formed request that conflicts with current state (duplicate
+            // SKU). 400 would wrongly suggest a malformed payload.
             ConflictException conflict => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,

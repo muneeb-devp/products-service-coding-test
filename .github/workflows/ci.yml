@@ -26,7 +26,7 @@ env:
 
 jobs:
   backend:
-    name: Backend — build & test
+    name: Backend, build & test
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -56,11 +56,11 @@ jobs:
       - name: Build
         # Warnings are treated as errors here but not locally. That keeps local
         # iteration quick while making the zero-warning standard actually
-        # enforced — including the NuGet audit warnings that flag a dependency
+        # enforced, including the NuGet audit warnings that flag a dependency
         # with a new security advisory.
         run: dotnet build ProductsService.slnx --configuration Release --no-restore -warnaserror
 
-      - name: Unit tests — Domain
+      - name: Unit tests, Domain
         run: >
           dotnet test tests/Products.Domain.Tests/Products.Domain.Tests.csproj
           --configuration Release --no-build
@@ -68,7 +68,7 @@ jobs:
           --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
 
-      - name: Unit tests — Application
+      - name: Unit tests, Application
         run: >
           dotnet test tests/Products.Application.Tests/Products.Application.Tests.csproj
           --configuration Release --no-build
@@ -76,7 +76,7 @@ jobs:
           --collect:"XPlat Code Coverage"
           --results-directory ./TestResults
 
-      - name: Integration tests — API
+      - name: Integration tests, API
         run: >
           dotnet test tests/Products.Api.IntegrationTests/Products.Api.IntegrationTests.csproj
           --configuration Release --no-build
@@ -131,7 +131,7 @@ jobs:
           retention-days: 7
 
   frontend:
-    name: Frontend — build & test
+    name: Frontend, build & test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

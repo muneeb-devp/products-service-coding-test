@@ -22,7 +22,7 @@ coverage.*.xml
 coverage.*.json
 lcov.info
 
-## Local data — the SQLite dev database is generated, never committed
+## Local data, the SQLite dev database is generated, never committed
 *.db
 *.db-shm
 *.db-wal
@@ -41,7 +41,7 @@ dist-ssr/
 coverage/
 *.local
 
-## Environment — .env.example IS committed, real .env files never are
+## Environment, .env.example IS committed, real .env files never are
 .env
 .env.*
 !.env.example

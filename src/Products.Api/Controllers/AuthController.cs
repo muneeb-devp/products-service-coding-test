@@ -14,19 +14,6 @@ namespace Products.Api.Controllers;
 /// <summary>
 /// Issues demo bearer tokens.
 /// </summary>
-/// <remarks>
-/// <strong>This endpoint is a stand-in for a real identity provider.</strong> It
-/// exists so the secured endpoints can be exercised without first standing up
-/// Azure AD, Auth0 or IdentityServer. In production this controller would not
-/// exist: tokens would come from the IdP, the API would only validate them
-/// against a published JWKS, and it would never hold a key capable of minting
-/// them.
-/// <para>
-/// The demo credentials are supplied through configuration rather than
-/// hardcoded, so this cannot become an accidental back door with a password
-/// that is compiled into the binary.
-/// </para>
-/// </remarks>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/auth")]
@@ -90,10 +77,6 @@ public sealed class AuthController(
     }
 
     /// <summary>Echoes the claims in the caller's token.</summary>
-    /// <remarks>
-    /// Useful when wiring up a client: it confirms the token is being sent and
-    /// accepted, separately from whether a business endpoint works.
-    /// </remarks>
     /// <response code="200">The authenticated subject and their claims.</response>
     /// <response code="401">No valid bearer token was supplied.</response>
     [HttpGet("me")]
@@ -110,13 +93,6 @@ public sealed class AuthController(
     /// <summary>
     /// Compares credentials in fixed time.
     /// </summary>
-    /// <remarks>
-    /// Ordinary string comparison returns as soon as it finds a differing
-    /// character, so how long it takes leaks how much of the guess was correct.
-    /// Overkill for a demo credential, but comparing secrets in constant time is
-    /// the habit worth having — and doing it wrong here would be the thing a
-    /// reviewer rightly flags.
-    /// </remarks>
     private bool AreCredentialsValid(string username, string password) =>
         CryptographicOperations.FixedTimeEquals(
             System.Text.Encoding.UTF8.GetBytes(username),

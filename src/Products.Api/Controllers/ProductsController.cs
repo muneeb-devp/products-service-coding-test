@@ -19,19 +19,6 @@ namespace Products.Api.Controllers;
 /// <summary>
 /// The product catalogue.
 /// </summary>
-/// <remarks>
-/// Every action on this controller requires a bearer token. The controller is
-/// intentionally thin — it translates HTTP to a MediatR message and back, and
-/// contains no business logic. Errors are not caught here: the global exception
-/// handler owns the mapping from exception to status code, so that mapping
-/// exists once rather than in every action.
-/// <para>
-/// Two routes are registered. <c>/api/products</c> matches the contract in the
-/// brief and resolves to the default version; <c>/api/v1/products</c> is the
-/// explicit form. Both reach the same code, so clients can pin a version
-/// without the unversioned URL breaking.
-/// </para>
-/// </remarks>
 [ApiController]
 [Authorize]
 [ApiVersion("1.0")]
@@ -81,13 +68,6 @@ public sealed class ProductsController(ISender sender) : ControllerBase
     }
 
     /// <summary>Returns products of one colour.</summary>
-    /// <remarks>
-    /// A convenience route for the requirement "retrieve all products of a
-    /// specific colour". It delegates to the same query as
-    /// <see cref="GetProducts"/> with the filter set, so there is one
-    /// implementation of the filtering, paging and sorting rather than two that
-    /// can drift apart.
-    /// </remarks>
     /// <param name="colour">The colour to filter by, e.g. <c>Red</c>.</param>
     /// <param name="page">1-based page number.</param>
     /// <param name="pageSize">Items per page.</param>
@@ -153,13 +133,8 @@ public sealed class ProductsController(ISender sender) : ControllerBase
     {
         var product = await sender.Send(request.ToCommand(), cancellationToken);
 
-        // 201 with a Location header pointing at the canonical URL of the new
-        // resource, as RFC 9110 requires — not a bare 200 with a body.
-        //
-        // CreatedAtAction rather than CreatedAtRoute: the controller exposes both
-        // the unversioned and versioned route templates, and a *named* route must
-        // map to exactly one template. Resolving by action name lets routing pick
-        // the template matching how the caller reached us.
+        // CreatedAtAction, not CreatedAtRoute: this controller has two route
+        // templates and a named route may only map to one.
         return CreatedAtAction(
             actionName: nameof(GetProductById),
             routeValues: new { id = product.Id },

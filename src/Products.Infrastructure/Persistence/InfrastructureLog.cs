@@ -5,11 +5,6 @@ namespace Products.Infrastructure.Persistence;
 /// <summary>
 /// Source-generated log messages for the Infrastructure layer.
 /// </summary>
-/// <remarks>
-/// Same rationale as the Application layer's equivalent: templates are verified
-/// against their arguments at compile time, and nothing is evaluated when the
-/// level is disabled.
-/// </remarks>
 internal static partial class InfrastructureLog
 {
     [LoggerMessage(
