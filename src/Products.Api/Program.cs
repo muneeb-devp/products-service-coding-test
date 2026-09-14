@@ -4,6 +4,7 @@ using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -47,7 +48,17 @@ try
     await app.RunAsync();
     return 0;
 }
-catch (Exception ex) when (ex is not HostAbortedException)
+// HostAbortedException is a normal Ctrl+C / SIGTERM shutdown, not a failure.
+//
+// StopTheHostException is thrown by the hosting infrastructure that
+// WebApplicationFactory uses to capture the built host and stop before Run().
+// It is internal, hence the name check. Swallowing it here would leave the test
+// host with no IHost at all, and the whole integration suite fails with "the
+// entry point exited without ever building an IHost" — which looks like a test
+// problem and is actually this catch block.
+catch (Exception ex) when (
+    ex is not HostAbortedException &&
+    ex.GetType().Name is not "StopTheHostException")
 {
     Log.Fatal(ex, "Products API terminated unexpectedly during start-up.");
     return 1;
@@ -64,9 +75,6 @@ finally
 /// </summary>
 internal static class ApiStartup
 {
-    /// <summary>CORS policy name for the configured frontend origins.</summary>
-    private const string CorsPolicyName = "FrontendOrigins";
-
     /// <summary>Registers everything owned by the API layer.</summary>
     public static IServiceCollection AddApiServices(
         this IServiceCollection services,
@@ -109,8 +117,25 @@ internal static class ApiStartup
 
         services.AddApiVersioningSupport();
         services.AddSwaggerSupport();
-        services.AddJwtAuthentication(configuration);
-        services.AddApiRateLimiting();
+        services.AddJwtAuthentication();
+        services.AddApiRateLimiting(configuration);
+
+        // Behind a load balancer, ingress or CDN, the socket's remote address is
+        // the proxy's, not the client's. Without this the rate limiter buckets
+        // every anonymous user together and request logs record one address for
+        // the entire internet.
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders =
+                ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+            // KnownIPNetworks/KnownProxies default to loopback only. In a real
+            // deployment these must name the actual proxy, otherwise the headers
+            // are ignored — or, if cleared without naming a proxy, any client
+            // could spoof X-Forwarded-For and escape its own rate-limit bucket.
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+        });
         services.AddCorsPolicy(configuration);
 
         return services;
@@ -210,55 +235,16 @@ internal static class ApiStartup
         return services;
     }
 
-    private static IServiceCollection AddJwtAuthentication(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    private static IServiceCollection AddJwtAuthentication(this IServiceCollection services)
     {
-        var jwt = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
-            ?? throw new InvalidOperationException(
-                $"Configuration section '{JwtOptions.SectionName}' is missing.");
-
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    // Every one of these is on deliberately. Turning any of them
-                    // off is the usual way a JWT implementation becomes
-                    // decorative: an unvalidated issuer or audience means a token
-                    // minted for a different service is accepted here.
-                    ValidateIssuer = true,
-                    ValidIssuer = jwt.Issuer,
+            .AddJwtBearer();
 
-                    ValidateAudience = true,
-                    ValidAudience = jwt.Audience,
-
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwt.SigningKey)),
-
-                    ValidateLifetime = true,
-
-                    // Default is five minutes, which silently extends every
-                    // token's life. Thirty seconds absorbs real clock drift
-                    // without meaningfully widening the window.
-                    ClockSkew = TimeSpan.FromSeconds(30),
-
-                    // Pin the algorithm. Without this the token's own header
-                    // influences how it is verified, which is the root of the
-                    // classic "alg" confusion attacks.
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                };
-
-                // Bearer tokens are credentials: only ever over TLS outside
-                // development.
-                options.RequireHttpsMetadata =
-                    !string.Equals(
-                        Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
-                        "Development",
-                        StringComparison.OrdinalIgnoreCase);
-            });
+        // The validation parameters are supplied by ConfigureJwtBearerOptions,
+        // which resolves JwtOptions through the options system rather than
+        // reading configuration during registration.
+        services.ConfigureOptions<ConfigureJwtBearerOptions>();
 
         services.AddAuthorization();
 
@@ -269,32 +255,24 @@ internal static class ApiStartup
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-            ?? [];
+        services.AddOptions<CorsSettings>()
+            .Bind(configuration.GetSection(CorsSettings.SectionName));
 
-        return services.AddCors(options => options.AddPolicy(CorsPolicyName, policy =>
-        {
-            if (allowedOrigins.Length == 0)
-            {
-                // No origins configured means no cross-origin access, rather
-                // than "allow everything". A permissive default is how a
-                // development convenience reaches production.
-                return;
-            }
+        services.ConfigureOptions<ConfigureCorsOptions>();
+        services.AddCors();
 
-            policy.WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                // Lets the browser read the paging/versioning headers the API
-                // sets; without this they are hidden from JavaScript.
-                .WithExposedHeaders("api-supported-versions", "api-deprecated-versions", "Retry-After");
-        }));
+        return services;
     }
 
     /// <summary>Builds the HTTP pipeline. Middleware order here is behaviour, not style.</summary>
     public static async Task ConfigurePipelineAsync(this WebApplication app)
     {
-        // First, so it catches exceptions thrown by everything after it.
+        // First: rewrites the client address and scheme from the forwarded
+        // headers, so every later component — logging, rate limiting, HTTPS
+        // redirection — sees the real client rather than the proxy.
+        app.UseForwardedHeaders();
+
+        // Then the exception handler, so it catches everything after it.
         app.UseExceptionHandler();
         app.UseStatusCodePages();
 
@@ -343,7 +321,7 @@ internal static class ApiStartup
 
         // CORS must precede authentication: a rejected pre-flight never carries
         // credentials, and the browser needs the CORS headers on it regardless.
-        app.UseCors(CorsPolicyName);
+        app.UseCors(ConfigureCorsOptions.PolicyName);
 
         app.UseRateLimiter();
 

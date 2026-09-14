@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace Products.Api.Infrastructure;
 
@@ -22,8 +23,16 @@ internal static class RateLimitingPolicies
     public const string Authentication = "authentication";
 
     /// <summary>Registers the rate-limiting policies.</summary>
-    public static IServiceCollection AddApiRateLimiting(this IServiceCollection services) =>
-        services.AddRateLimiter(options =>
+    public static IServiceCollection AddApiRateLimiting(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOptions<RateLimitingOptions>()
+            .Bind(configuration.GetSection(RateLimitingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        return services.AddRateLimiter(options =>
         {
             // 429 is the correct status; the default is 503, which wrongly
             // suggests the service is down rather than that this caller is
@@ -38,8 +47,8 @@ internal static class RateLimitingPolicies
                     partitionKey: GetPartitionKey(httpContext),
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 20,
-                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = GetLimits(httpContext).Writes.PermitLimit,
+                        Window = TimeSpan.FromSeconds(GetLimits(httpContext).Writes.WindowSeconds),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
 
                         // No queue: a write held in a queue is a request the
@@ -55,8 +64,9 @@ internal static class RateLimitingPolicies
                     {
                         // Tighter: this endpoint is what a credential-stuffing
                         // attempt would hammer.
-                        PermitLimit = 10,
-                        Window = TimeSpan.FromMinutes(1),
+                        PermitLimit = GetLimits(httpContext).Authentication.PermitLimit,
+                        Window = TimeSpan.FromSeconds(
+                            GetLimits(httpContext).Authentication.WindowSeconds),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0,
                     }));
@@ -82,7 +92,36 @@ internal static class RateLimitingPolicies
                     cancellationToken);
             };
         });
+    }
 
+    /// <summary>
+    /// Resolves the configured limits from the request's service scope.
+    /// </summary>
+    /// <remarks>
+    /// Resolved here rather than captured at registration time so the values
+    /// come from the fully composed configuration. The limiter for a given
+    /// partition is built once and then cached by the framework, so this is not
+    /// a per-request cost in any meaningful sense.
+    /// </remarks>
+    private static RateLimitingOptions GetLimits(HttpContext httpContext) =>
+        httpContext.RequestServices.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+
+    /// <summary>
+    /// Chooses the bucket a request is counted against.
+    /// </summary>
+    /// <remarks>
+    /// Authenticated callers are partitioned by identity, which is both more
+    /// precise than an address and immune to NAT lumping unrelated users
+    /// together.
+    /// <para>
+    /// Anonymous callers fall back to the remote address. This only works if the
+    /// address is the <em>client's</em>: behind a load balancer or ingress,
+    /// <c>RemoteIpAddress</c> is the proxy's, so every anonymous user in the
+    /// world would share one bucket and the first ten requests per minute would
+    /// lock out everyone else. Forwarded-header processing is configured in the
+    /// pipeline to keep this honest — see <c>Program.cs</c>.
+    /// </para>
+    /// </remarks>
     private static string GetPartitionKey(HttpContext httpContext) =>
         httpContext.User.Identity?.IsAuthenticated == true
             ? $"user:{httpContext.User.Identity.Name}"
